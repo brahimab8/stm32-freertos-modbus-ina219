@@ -35,19 +35,25 @@ This project integrates FreeModbus RTU with STM32Cube HAL and FreeRTOS on a Nucl
 For step-by-step configuration (GPIO, I²C1, USART1, FreeRTOS, NVIC, timebase, etc.), see [Setup](docs/01-setup.md)
 
 ---
-
 ## Build & Flash
 
 ### STM32CubeIDE
 
-git clone [https://github.com/brahimab8/stm32-freertos-modbus-ina219.git](https://github.com/brahimab8/stm32-freertos-modbus-ina219.git)
+```bash
+git clone https://github.com/brahimab8/stm32-freertos-modbus-ina219.git
 cd stm32-freertos-modbus-ina219
-Open the .ioc in CubeIDE, generate code, then Build & Debug
+```
+
+1. Open the `.ioc` file in STM32CubeIDE
+2. Let CubeIDE generate code
+3. Click **Build** then **Debug**
 
 ### Command-Line
 
-make        # Build
+```bash
+make        # Build the project
 make flash  # Flash via ST-LINK
+```
 
 ---
 
