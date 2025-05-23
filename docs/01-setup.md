@@ -2,6 +2,11 @@
 
 Configure a Nucleo-L432KC project with FreeRTOS and interrupt-driven USART1 echo on PA8 (relay), I²C reserved for INA219.
 
+**Hardware & Host**
+
+* **STM32 side:** Nucleo-L432KC + RS-485 transceiver breakout (e.g. MAX3485) on PB6/PB7
+* **Host side:** Windows laptop with STM32CubeIDE and Python, plus an RS-485 USB-to-serial adapter
+
 ![CubeMX pinout](images/cube_pinout.png)
 
 1. **Create project**
@@ -49,3 +54,22 @@ Configure a Nucleo-L432KC project with FreeRTOS and interrupt-driven USART1 echo
 ```
 
 Flash and run: the relay on PA8 toggles and each received byte is echoed back.
+
+---
+
+## Master side
+
+A simple Python helper lives in `scripts/send_byte.py`:
+
+```bash
+pip install pyserial
+python scripts/send_byte.py <PORT> [-b BAUD] [-t TIMEOUT]
+```
+
+Launch it and you’ll see:
+
+```
+Char>
+```
+
+Type a single character, hit Enter → the script sends exactly that byte over your RS-485 USB adapter and prints the board’s reply (or `<timeout>`). Type `quit` or Ctrl-C to exit.

@@ -15,9 +15,9 @@ This project integrates FreeModbus RTU with STM32Cube HAL and FreeRTOS on a Nucl
 ## Features
 
 * FreeRTOS-based Modbus-RTU port on STM32Cube HAL
-* RS-485 slave on **USART1** (optional DE control on PB0)
-* INA219 I²C driver (I²C1 on PB6/PB7)
-* GPIO control for LED/relay (PB1)
+* RS-485 slave on **USART1** (optional DE control)
+* INA219 I²C driver
+* GPIO control for LED/relay
 * Optional debug console on USART2
 
 ---
