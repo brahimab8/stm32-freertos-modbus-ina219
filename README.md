@@ -1,38 +1,47 @@
-# STM32 FreeRTOS Modbus RTU Slave
+# STM32 I²C Sensor Hub
 
 ---
 
 ## Description
 
-This project integrates FreeModbus RTU with STM32Cube HAL and FreeRTOS on a Nucleo-L432KC:
+A generic FreeRTOS/CMSIS‐RTOS2 framework for managing multiple I²C sensors on STM32, with:
 
-* Reads voltage/current from an INA219 via I²C
-* Exposes readings in Modbus holding registers
-* Controls a GPIO (LED or relay) via Modbus coil writes
+- **Dynamic add/remove** of sensors at runtime  
+- **Plugin drivers** (e.g. INA219, BMP280, HTU21D…) each in its own source file  
+- **Per‐sensor configuration** (sampling period, measurement mask, gain/range, calibration)  
+- **UART-command UI** for reading sensor data, raw register access, and runtime control  
+- **GPIO outputs** (LEDs, relays) controllable via UART commands  
 
 ---
 
 ## Features
 
-* FreeRTOS-based Modbus-RTU port on STM32Cube HAL
-* RS-485 slave on **USART1** (optional DE control)
-* INA219 I²C driver
-* GPIO control for LED/relay
-* Optional debug console on USART2
+- **FreeRTOS-based SensorTask** per device, with fixed-rate sampling  
+- **Bus arbitration** via a shared CMSIS mutex around all I²C traffic  
+- **SensorManager** for high-level add/remove, configure, and read APIs  
+- **UART command interface** on USART1 (6-byte packets)  
+- **Raw register read/write** primitives for any managed device  
+- **Optional debug console** on USART2  
+
 
 ---
 
 ## Dependencies
 
-* **FreeModbus v1.5.2** (BSD-2-Clause)
-* **STM32Cube HAL & CMSIS**
 * **FreeRTOS (CMSIS-RTOS2)**
+* **STM32Cube HAL & CMSIS**
+
+---
+
+## Architecture
+
+For a high-level overview of modules, data flows, and RTOS tasks, see [docs/architecture.md](docs/architecture.md).
 
 ---
 
 ## Setup
 
-For step-by-step configuration (GPIO, I²C1, USART1, FreeRTOS, NVIC, timebase, etc.), see [Setup](docs/01-setup.md)
+Detailed peripheral and setup steps are in [docs/01-setup.md].
 
 ---
 ## Build & Flash
@@ -40,8 +49,8 @@ For step-by-step configuration (GPIO, I²C1, USART1, FreeRTOS, NVIC, timebase, e
 ### STM32CubeIDE
 
 ```bash
-git clone https://github.com/brahimab8/stm32-freertos-modbus-ina219.git
-cd stm32-freertos-modbus-ina219
+git clone https://github.com/brahimab8/stm32-i2c-sensor-hub.git
+cd stm32-i2c-sensor-hub
 ```
 
 1. Open the `.ioc` file in STM32CubeIDE
@@ -57,8 +66,13 @@ make flash  # Flash via ST-LINK
 
 ---
 
+## Usage
+- To-Do
+- 
+
+---
+
 ## License
 
-* **Project:** MIT
-* **FreeModbus:** BSD-2-Clause
+* **Project:** [MIT](LICENSE)
 * **FreeRTOS (CMSIS-RTOS2):** MIT
