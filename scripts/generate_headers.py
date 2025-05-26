@@ -75,7 +75,7 @@ def gen_protocol(proto, out_dir):
         lines.append("")
 
     # write out
-    inc_dir = os.path.join(out_dir, "Inc")
+    inc_dir = os.path.join(out_dir, "Inc", "config")
     os.makedirs(inc_dir, exist_ok=True)
     out_h = os.path.join(inc_dir, "protocol.h")
     with open(out_h, "w") as f:
@@ -92,7 +92,7 @@ def gen_sensor_config(meta, out_dir):
         f"/* Auto-generated {name} config */",
         "#pragma once",
         "#include <stdint.h>",
-        f'#include "{snake_case(name)}.h"',
+        f'#include "drivers/{snake_case(name)}.h"',
         ""
     ]
     # typedef
@@ -118,7 +118,7 @@ def gen_sensor_config(meta, out_dir):
     hdr.append(f"extern {struct} {sc}_defaults;")
     hdr.append("")
 
-    inc_dir = os.path.join(out_dir, "Inc")
+    inc_dir = os.path.join(out_dir, "Inc", "config")
     os.makedirs(inc_dir, exist_ok=True)
     out_h = os.path.join(inc_dir, f"{sc}_config.h")
     with open(out_h, "w") as f:
@@ -128,7 +128,7 @@ def gen_sensor_config(meta, out_dir):
     # 2) C file with definition
     src = [
         f"/* Auto-generated {name} defaults definition */",
-        f'#include "{sc}_config.h"',
+        f'#include "config/{sc}_config.h"',
         ""
     ]
     src.append(f"{struct} {sc}_defaults = {{")
@@ -137,7 +137,7 @@ def gen_sensor_config(meta, out_dir):
     src.append("};")
     src.append("")
 
-    src_dir = os.path.join(out_dir, "Src")
+    src_dir = os.path.join(out_dir, "Src", "config")    
     os.makedirs(src_dir, exist_ok=True)
     out_c = os.path.join(src_dir, f"{sc}_config.c")
     with open(out_c, "w") as f:
