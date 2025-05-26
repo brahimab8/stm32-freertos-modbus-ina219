@@ -24,6 +24,9 @@
 #define CMD_SET_RANGE        6
 #define CMD_SET_CAL          7
 
+// Sensor type codes
+#define SENSOR_TYPE_INA219   1
+
 // Master → node: always 6 bytes
 typedef struct {
     uint8_t sof;

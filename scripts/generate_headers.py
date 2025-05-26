@@ -57,6 +57,16 @@ def gen_protocol(proto, out_dir):
         lines.append(f"#define {k:<20} {v}")
     lines.append("")
 
+    # sensor‐type codes
+    sensors = proto.get("sensors", {})
+    if sensors:
+        lines.append("// Sensor type codes")
+        for name, code in sensors.items():
+            # e.g. SENSOR_TYPE_INA219 1
+            macro = f"SENSOR_TYPE_{name.upper()}"
+            lines.append(f"#define {macro:<20} {code}")
+        lines.append("")
+
     # frame structs
     for fname, frm in proto.get("frames", {}).items():
         struct = fname.upper()

@@ -19,6 +19,10 @@
     "CMD_SET_CAL":          7
   },
 
+  "sensors": {
+    "INA219":     1
+  },
+
   "frames": {
     "command": {
       "description": "Master → node: always 6 bytes",

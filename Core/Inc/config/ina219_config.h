@@ -1,7 +1,7 @@
 /* Auto-generated ina219 config */
 #pragma once
 #include <stdint.h>
-#include "ina219.h"
+#include "drivers/ina219.h"
 
 typedef struct {
     INA219_Gain_t gain;

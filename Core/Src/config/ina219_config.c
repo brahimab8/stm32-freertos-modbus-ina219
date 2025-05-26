@@ -1,5 +1,5 @@
 /* Auto-generated ina219 defaults definition */
-#include "ina219_config.h"
+#include "config/ina219_config.h"
 
 ina219_config_defaults_t ina219_defaults = {
     .gain = INA219_GAIN_8_320MV,
