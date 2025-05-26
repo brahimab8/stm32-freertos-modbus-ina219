@@ -1,6 +1,7 @@
 # 02 – SensorTask Tutorial
 
-*Polling of one or more I²C sensors via FreeRTOS with raw data exposure over UART, employing an auto-generated framing protocol.*
+*Polling of one or more I²C sensors via FreeRTOS with raw data exposure over UART, employing an auto-generated framing protocol.*<br>
+*This tutorial matches [v1.0.0 of the code](https://github.com/brahimab8/stm32-i2c-sensor-hub/tree/v1.0.0).*
 
 ---
 
