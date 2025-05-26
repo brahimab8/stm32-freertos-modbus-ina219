@@ -35,5 +35,5 @@ const SensorDriverInfo_t sensor_driver_registry[] = {
     .get_driver = INA219_GetDriver,
     .configure  = ina219_configure
   },
-  { 0, 0, NULL, NULL, NULL }  // terminator
+  DRIVER_REGISTRY_END  // terminator
 };

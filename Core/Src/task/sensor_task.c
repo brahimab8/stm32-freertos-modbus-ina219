@@ -136,3 +136,11 @@ void SensorTask_Flush(SensorTaskHandle_t *h) {
 uint8_t SensorTask_GetSampleSize(const SensorTaskHandle_t *h) {
     return h ? h->drv->sample_size : 0;
 }
+
+void SensorTask_UpdatePeriod(SensorTaskHandle_t *h, uint32_t period_ms)
+{
+    if (!h || period_ms == 0) {
+        return;
+    }
+    h->period_ms = period_ms;
+}

@@ -90,4 +90,12 @@ void SensorTask_Flush(SensorTaskHandle_t *h);
  */
 uint8_t SensorTask_GetSampleSize(const SensorTaskHandle_t *h);
 
+/**
+ * @brief   Change the polling interval of an existing SensorTask.
+ * @param   h           SensorTask handle returned from SensorTask_Create().
+ * @param   period_ms   New interval in milliseconds.
+ */
+void SensorTask_UpdatePeriod(SensorTaskHandle_t *h, uint32_t period_ms);
+
+
 #endif // SENSOR_TASK_H

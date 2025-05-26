@@ -8,6 +8,8 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#define DRIVER_REGISTRY_END { 0, 0, NULL, NULL, NULL }
+
 typedef struct {
     uint8_t                type_code;   
     size_t                 ctx_size;     ///< sizeof the ctx struct

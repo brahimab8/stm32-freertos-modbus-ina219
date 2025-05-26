@@ -27,8 +27,7 @@
 
 #include "config/config.h" 
 #include "config/protocol.h"
-#include "task/sensor_task.h"
-#include "drivers/ina219_driver.h"
+#include "task/sensor_manager.h"
 
 /* USER CODE END Includes */
 
@@ -60,17 +59,9 @@ const osThreadAttr_t defaultTask_attributes = {
 };
 
 /* USER CODE BEGIN PV */
-typedef struct {
-    SensorTaskHandle_t *task;
-    uint8_t             addr7;    // 7-bit I²C address
-} ActiveSensor_t;
-
-// list of the sensors with their 7-bit addr:
-static ActiveSensor_t active_sensors[] = {
-    { .task = NULL, .addr7 = 0x40 },
-    { .task = NULL, .addr7 = 0x41 },
-};
-#define NUM_ACTIVE_SENSORS  (sizeof(active_sensors)/sizeof(*active_sensors))
+static SensorManager_t *mgr;       // our new manager
+static const uint8_t    initial_addrs[] = { 0x40};
+#define NUM_INITIAL_SENSORS  (sizeof(initial_addrs)/sizeof(initial_addrs[0]))
 
 static volatile uint8_t      rx_byte;    // volatile storage
 static uint8_t        rx_temp;      	// non-volatile buffer
@@ -151,14 +142,6 @@ static void send_all_samples(UART_HandleTypeDef *huart,
     // XOR checksum over all bytes except the initial SOF (buf[1..RESPONSE_HEADER_LENGTH+payload_len-1])
     pkt[pkt_len - 1] = xor_checksum(pkt, 1, RESPONSE_HEADER_LENGTH + payload_len - 1);
 
-    // send it
-    // debug dump over huart2:
-    for (size_t j = 0; j < pkt_len; j++) {
-        char buf[6];
-        int n = snprintf(buf, sizeof(buf), "%02X ", pkt[j]);
-        HAL_UART_Transmit(&huart2, (uint8_t*)buf, n, HAL_MAX_DELAY);
-    }
-    HAL_UART_Transmit(&huart2, (uint8_t*)"\r\n", 2, HAL_MAX_DELAY);
 
     // now actually send on the real UART port
     HAL_UART_Transmit_IT(huart, pkt, pkt_len);
@@ -171,17 +154,22 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *h) {
 
     rx_byte = rx_temp;
 
-    if (rx_byte >= '1' && rx_byte < '1' + NUM_ACTIVE_SENSORS) {
-        uint8_t idx = rx_byte - '1';
-        send_all_samples(&huart1,
-                         BOARD_ID,
-                         active_sensors[idx].addr7,
-                         active_sensors[idx].task);
-    }
-
+    if (rx_byte >= '1' && rx_byte < '1' + NUM_INITIAL_SENSORS) {
+        uint8_t idx   = rx_byte - '1';
+        uint8_t addr7 = initial_addrs[idx];
+        // get the task handle from the manager
+        SensorTaskHandle_t *task = SensorManager_GetTask(mgr, addr7);
+        if (task) {
+          send_all_samples(&huart1, BOARD_ID, addr7, task);
+        }
+        else {
+          // optional: send an error byte
+          uint8_t e = 0xEE;
+          HAL_UART_Transmit(&huart1, &e, 1, HAL_MAX_DELAY);
+        }
     // re-arm
     HAL_UART_Receive_IT(&huart1, &rx_temp, 1);
-
+  }
 }
 
 /* USER CODE END 0 */
@@ -229,6 +217,10 @@ int main(void)
   /* USER CODE BEGIN RTOS_MUTEX */
   busMutex = osMutexNew(NULL);
   if (busMutex == NULL) Error_Handler();
+  // create the sensor manager
+  mgr = SensorManager_Create(busMutex, &hi2c1);
+  if (!mgr) Error_Handler();
+
   /* USER CODE END RTOS_MUTEX */
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
@@ -248,23 +240,18 @@ int main(void)
   defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
-  // spawn one SensorTask per entry in active_sensors[]
-  for (uint8_t i = 0; i < NUM_ACTIVE_SENSORS; i++) {
-    // build context for INA219
-    INA219_Ctx_t *ctx = pvPortMalloc(sizeof(*ctx));
-    ctx->hi2c  = &hi2c1;
-    ctx->addr8 = (active_sensors[i].addr7 << 1);
-    
-    // create the sensor task
-    active_sensors[i].task = SensorTask_Create(
-        INA219_GetDriver(),
-        ctx,
-        SENSOR_DEFAULT_POLL_PERIOD,    
-        busMutex,
-        QUEUE_DEPTH      
-    );
-    if (!active_sensors[i].task) Error_Handler();
-  }
+ // tell the manager to start each INA219
+ for (uint8_t i = 0; i < NUM_INITIAL_SENSORS; ++i) {
+     if (SensorManager_AddByType(
+           mgr,
+           SENSOR_TYPE_INA219,
+           initial_addrs[i],
+           SENSOR_DEFAULT_POLL_PERIOD
+         ) != SM_OK)
+     {
+       Error_Handler();
+     }
+ }
 
   /* USER CODE END RTOS_THREADS */
 
@@ -521,10 +508,12 @@ void StartDefaultTask(void *argument)
 
   /* TODO: SensorManager: parse incoming commands and dispatch to tasks */
   
-  /* Infinite loop */
-  for (;;)
-  {
-    osDelay(1);
+  char buf[64];
+  for (;;) {
+	size_t freeHeap = xPortGetFreeHeapSize();
+	snprintf(buf, sizeof(buf), "Free heap: %u bytes\r\n", (unsigned int)freeHeap);
+	HAL_UART_Transmit(&huart2, (uint8_t*)buf, strlen(buf), HAL_MAX_DELAY);
+	osDelay(1000);
   }
   /* USER CODE END 5 */
 }
