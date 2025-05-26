@@ -1,0 +1,12 @@
+{
+  "name": "ina219",
+  "config_defaults": {
+    "gain":        "INA219_GAIN_8_320MV",
+    "bus_range":   "INA219_BVOLTAGERANGE_32V",
+    "calibration": 4096
+  },
+  "payload_fields": [
+    { "name": "bus_voltage_mV", "type": "uint16", "size": 2 },
+    { "name": "current_uA",     "type": "int32",  "size": 4 }
+  ]
+}
