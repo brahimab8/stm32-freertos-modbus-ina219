@@ -9,7 +9,7 @@
 #define STATUS_ERROR         1
 #define TICK_BYTES           4
 #define QUEUE_DEPTH          10
-#define CHECKSUM_LENGTH     1
+#define CHECKSUM_LENGTH      1
 
 // Size of response header before the trailing checksum
 #define RESPONSE_HEADER_LENGTH  offsetof(RESPONSE_HEADER_t, length) + 1

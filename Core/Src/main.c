@@ -1,20 +1,20 @@
 /* USER CODE BEGIN Header */
 /**
-  ******************************************************************************
-  * @file           : main.c
-  * @brief          : Main program body
-  ******************************************************************************
-  * @attention
-  *
-  * Copyright (c) 2025 STMicroelectronics.
-  * All rights reserved.
-  *
-  * This software is licensed under terms that can be found in the LICENSE file
-  * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
-  *
-  ******************************************************************************
-  */
+ ******************************************************************************
+ * @file           : main.c
+ * @brief          : Main program body
+ ******************************************************************************
+ * @attention
+ *
+ * Copyright (c) 2025 STMicroelectronics.
+ * All rights reserved.
+ *
+ * This software is licensed under terms that can be found in the LICENSE file
+ * in the root directory of this software component.
+ * If no LICENSE file comes with this software, it is provided AS-IS.
+ *
+ ******************************************************************************
+ */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
@@ -22,7 +22,13 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <stdio.h>
 #include <string.h>
+
+#include "config/config.h" 
+#include "config/protocol.h"
+#include "task/sensor_task.h"
+#include "drivers/ina219_driver.h"
 
 /* USER CODE END Includes */
 
@@ -43,19 +49,32 @@
 
 /* Private variables ---------------------------------------------------------*/
 I2C_HandleTypeDef hi2c1;
-
-UART_HandleTypeDef huart1;
-UART_HandleTypeDef huart2;
+UART_HandleTypeDef huart1, huart2;
 
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
 const osThreadAttr_t defaultTask_attributes = {
-  .name = "defaultTask",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityNormal,
+    .name = "defaultTask",
+    .stack_size = 128 * 4,
+    .priority = (osPriority_t)osPriorityNormal,
 };
+
 /* USER CODE BEGIN PV */
-static uint8_t rx_byte;
+typedef struct {
+    SensorTaskHandle_t *task;
+    uint8_t             addr7;    // 7-bit I²C address
+} ActiveSensor_t;
+
+// list of the sensors with their 7-bit addr:
+static ActiveSensor_t active_sensors[] = {
+    { .task = NULL, .addr7 = 0x40 },
+    { .task = NULL, .addr7 = 0x41 },
+};
+#define NUM_ACTIVE_SENSORS  (sizeof(active_sensors)/sizeof(*active_sensors))
+
+static volatile uint8_t      rx_byte;    // volatile storage
+static uint8_t        rx_temp;      	// non-volatile buffer
+static osMutexId_t  busMutex;   // shared I²C mutex
 
 /* USER CODE END PV */
 
@@ -74,27 +93,103 @@ void StartDefaultTask(void *argument);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-
-/**
-  * @brief  UART receive complete callback.
-  * @param  huart: UART handle
-  */
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef* h) {
-  if (h->Instance == USART1) {
-    // toggle relay on PA8
-    HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_8);
-    // echo received byte back
-    HAL_UART_Transmit_IT(&huart1, &rx_byte, 1);
-    // re-arm for next byte
-    HAL_UART_Receive_IT(&huart1, &rx_byte, 1);
-  }
+/** XOR checksum over buf[start..start+len-1] */
+static uint8_t xor_checksum(const uint8_t *buf, size_t start, size_t len) {
+    uint8_t c = 0;
+    for (size_t i = 0; i < len; i++) c ^= buf[start + i];
+    return c;
 }
+
+/** Send *all* queued samples for that task in one framed UART packet */
+static void send_all_samples(UART_HandleTypeDef *huart,
+                             uint8_t board_id,
+                             uint8_t addr7,
+                             SensorTaskHandle_t *h)
+{
+    // pull the runtime parameters from the task handle
+    uint8_t  ssize  = SensorTask_GetSampleSize(h);
+    SensorSample_t samples[QUEUE_DEPTH]; 
+
+    uint32_t got;
+    HAL_StatusTypeDef st = SensorTask_ReadSamples(h, samples, QUEUE_DEPTH, &got);
+
+    uint8_t status      = (st == HAL_OK ? STATUS_OK : STATUS_ERROR);
+    uint8_t payload_len = got * (sizeof(uint32_t)  + ssize);
+
+	// total packet size = header + payload + checksum
+	const size_t pkt_len = RESPONSE_HEADER_LENGTH + payload_len + CHECKSUM_LENGTH;
+	uint8_t pkt[pkt_len];
+
+    // build header
+	  RESPONSE_HEADER_t hdr = {
+	  .sof      = SOF_MARKER,
+	  .board_id = board_id,
+	  .addr7    = addr7,
+	  .cmd      = CMD_READ_SAMPLES,
+	  .status   = status,
+	  .length   = payload_len
+    // note: payload[] is a flexible member, and checksum will be appended later
+	};
+
+    // copy header into the packet buffer
+    memcpy(pkt, &hdr, RESPONSE_HEADER_LENGTH);
+
+    // pack each sample (tick + buf[]) right after the header
+    size_t off = RESPONSE_HEADER_LENGTH;
+    for (uint32_t n = 0; n < got; n++) {
+        SensorSample_t *s = &samples[n];
+        // big-endian tick
+        pkt[off++] = (s->tick >> 24) & 0xFF;
+        pkt[off++] = (s->tick >> 16) & 0xFF;
+        pkt[off++] = (s->tick >>  8) & 0xFF;
+        pkt[off++] =  s->tick        & 0xFF;
+        // then the driver payload
+        memcpy(&pkt[off], s->buf, ssize);
+        off += ssize;
+    }
+
+    // XOR checksum over all bytes except the initial SOF (buf[1..RESPONSE_HEADER_LENGTH+payload_len-1])
+    pkt[pkt_len - 1] = xor_checksum(pkt, 1, RESPONSE_HEADER_LENGTH + payload_len - 1);
+
+    // send it
+    // debug dump over huart2:
+    for (size_t j = 0; j < pkt_len; j++) {
+        char buf[6];
+        int n = snprintf(buf, sizeof(buf), "%02X ", pkt[j]);
+        HAL_UART_Transmit(&huart2, (uint8_t*)buf, n, HAL_MAX_DELAY);
+    }
+    HAL_UART_Transmit(&huart2, (uint8_t*)"\r\n", 2, HAL_MAX_DELAY);
+
+    // now actually send on the real UART port
+    HAL_UART_Transmit_IT(huart, pkt, pkt_len);
+}
+
+/** UART callback: on ASCII '1'..'N', send sensor #index samples */
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *h) {
+    if (h->Instance != USART1) return;
+    HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_8);
+
+    rx_byte = rx_temp;
+
+    if (rx_byte >= '1' && rx_byte < '1' + NUM_ACTIVE_SENSORS) {
+        uint8_t idx = rx_byte - '1';
+        send_all_samples(&huart1,
+                         BOARD_ID,
+                         active_sensors[idx].addr7,
+                         active_sensors[idx].task);
+    }
+
+    // re-arm
+    HAL_UART_Receive_IT(&huart1, &rx_temp, 1);
+
+}
+
 /* USER CODE END 0 */
 
 /**
-  * @brief  The application entry point.
-  * @retval int
-  */
+ * @brief  The application entry point.
+ * @retval int
+ */
 int main(void)
 {
 
@@ -124,6 +219,7 @@ int main(void)
   MX_I2C1_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
+  HAL_UART_Receive_IT(&huart1, &rx_temp, 1);
 
   /* USER CODE END 2 */
 
@@ -131,7 +227,8 @@ int main(void)
   osKernelInitialize();
 
   /* USER CODE BEGIN RTOS_MUTEX */
-  /* add mutexes, ... */
+  busMutex = osMutexNew(NULL);
+  if (busMutex == NULL) Error_Handler();
   /* USER CODE END RTOS_MUTEX */
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
@@ -151,7 +248,24 @@ int main(void)
   defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
-  /* add threads, ... */
+  // spawn one SensorTask per entry in active_sensors[]
+  for (uint8_t i = 0; i < NUM_ACTIVE_SENSORS; i++) {
+    // build context for INA219
+    INA219_Ctx_t *ctx = pvPortMalloc(sizeof(*ctx));
+    ctx->hi2c  = &hi2c1;
+    ctx->addr8 = (active_sensors[i].addr7 << 1);
+    
+    // create the sensor task
+    active_sensors[i].task = SensorTask_Create(
+        INA219_GetDriver(),
+        ctx,
+        SENSOR_DEFAULT_POLL_PERIOD,    
+        busMutex,
+        QUEUE_DEPTH      
+    );
+    if (!active_sensors[i].task) Error_Handler();
+  }
+
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
@@ -175,30 +289,30 @@ int main(void)
 }
 
 /**
-  * @brief System Clock Configuration
-  * @retval None
-  */
+ * @brief System Clock Configuration
+ * @retval None
+ */
 void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
   /** Configure the main internal regulator output voltage
-  */
+   */
   if (HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1) != HAL_OK)
   {
     Error_Handler();
   }
 
   /** Configure LSE Drive Capability
-  */
+   */
   HAL_PWR_EnableBkUpAccess();
   __HAL_RCC_LSEDRIVE_CONFIG(RCC_LSEDRIVE_LOW);
 
   /** Initializes the RCC Oscillators according to the specified parameters
-  * in the RCC_OscInitTypeDef structure.
-  */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSE|RCC_OSCILLATORTYPE_MSI;
+   * in the RCC_OscInitTypeDef structure.
+   */
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSE | RCC_OSCILLATORTYPE_MSI;
   RCC_OscInitStruct.LSEState = RCC_LSE_ON;
   RCC_OscInitStruct.MSIState = RCC_MSI_ON;
   RCC_OscInitStruct.MSICalibrationValue = 0;
@@ -216,9 +330,8 @@ void SystemClock_Config(void)
   }
 
   /** Initializes the CPU, AHB and APB buses clocks
-  */
-  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
-                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
+   */
+  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK | RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
@@ -230,15 +343,15 @@ void SystemClock_Config(void)
   }
 
   /** Enable MSI Auto calibration
-  */
+   */
   HAL_RCCEx_EnableMSIPLLMode();
 }
 
 /**
-  * @brief I2C1 Initialization Function
-  * @param None
-  * @retval None
-  */
+ * @brief I2C1 Initialization Function
+ * @param None
+ * @retval None
+ */
 static void MX_I2C1_Init(void)
 {
 
@@ -264,14 +377,14 @@ static void MX_I2C1_Init(void)
   }
 
   /** Configure Analogue filter
-  */
+   */
   if (HAL_I2CEx_ConfigAnalogFilter(&hi2c1, I2C_ANALOGFILTER_ENABLE) != HAL_OK)
   {
     Error_Handler();
   }
 
   /** Configure Digital filter
-  */
+   */
   if (HAL_I2CEx_ConfigDigitalFilter(&hi2c1, 0) != HAL_OK)
   {
     Error_Handler();
@@ -279,14 +392,13 @@ static void MX_I2C1_Init(void)
   /* USER CODE BEGIN I2C1_Init 2 */
 
   /* USER CODE END I2C1_Init 2 */
-
 }
 
 /**
-  * @brief USART1 Initialization Function
-  * @param None
-  * @retval None
-  */
+ * @brief USART1 Initialization Function
+ * @param None
+ * @retval None
+ */
 static void MX_USART1_UART_Init(void)
 {
 
@@ -314,14 +426,13 @@ static void MX_USART1_UART_Init(void)
   /* USER CODE BEGIN USART1_Init 2 */
 
   /* USER CODE END USART1_Init 2 */
-
 }
 
 /**
-  * @brief USART2 Initialization Function
-  * @param None
-  * @retval None
-  */
+ * @brief USART2 Initialization Function
+ * @param None
+ * @retval None
+ */
 static void MX_USART2_UART_Init(void)
 {
 
@@ -349,14 +460,13 @@ static void MX_USART2_UART_Init(void)
   /* USER CODE BEGIN USART2_Init 2 */
 
   /* USER CODE END USART2_Init 2 */
-
 }
 
 /**
-  * @brief GPIO Initialization Function
-  * @param None
-  * @retval None
-  */
+ * @brief GPIO Initialization Function
+ * @param None
+ * @retval None
+ */
 static void MX_GPIO_Init(void)
 {
   GPIO_InitTypeDef GPIO_InitStruct = {0};
@@ -400,18 +510,19 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN Header_StartDefaultTask */
 /**
-  * @brief  Function implementing the defaultTask thread.
-  * @param  argument: Not used
-  * @retval None
-  */
+ * @brief  Function implementing the defaultTask thread.
+ * @param  argument: Not used
+ * @retval None
+ */
 /* USER CODE END Header_StartDefaultTask */
 void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN 5 */
-  HAL_UART_Receive_IT(&huart1, &rx_byte, 1);
 
+  /* TODO: SensorManager: parse incoming commands and dispatch to tasks */
+  
   /* Infinite loop */
-  for(;;)
+  for (;;)
   {
     osDelay(1);
   }
@@ -419,13 +530,13 @@ void StartDefaultTask(void *argument)
 }
 
 /**
-  * @brief  Period elapsed callback in non blocking mode
-  * @note   This function is called  when TIM6 interrupt took place, inside
-  * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
-  * a global variable "uwTick" used as application time base.
-  * @param  htim : TIM handle
-  * @retval None
-  */
+ * @brief  Period elapsed callback in non blocking mode
+ * @note   This function is called  when TIM6 interrupt took place, inside
+ * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
+ * a global variable "uwTick" used as application time base.
+ * @param  htim : TIM handle
+ * @retval None
+ */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
   /* USER CODE BEGIN Callback 0 */
@@ -441,9 +552,9 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 }
 
 /**
-  * @brief  This function is executed in case of error occurrence.
-  * @retval None
-  */
+ * @brief  This function is executed in case of error occurrence.
+ * @retval None
+ */
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
@@ -455,14 +566,14 @@ void Error_Handler(void)
   /* USER CODE END Error_Handler_Debug */
 }
 
-#ifdef  USE_FULL_ASSERT
+#ifdef USE_FULL_ASSERT
 /**
-  * @brief  Reports the name of the source file and the source line number
-  *         where the assert_param error has occurred.
-  * @param  file: pointer to the source file name
-  * @param  line: assert_param error line source number
-  * @retval None
-  */
+ * @brief  Reports the name of the source file and the source line number
+ *         where the assert_param error has occurred.
+ * @param  file: pointer to the source file name
+ * @param  line: assert_param error line source number
+ * @retval None
+ */
 void assert_failed(uint8_t *file, uint32_t line)
 {
   /* USER CODE BEGIN 6 */

@@ -17,3 +17,6 @@ build/
 # IDE files
 .cproject
 .project
+.vscode/
+
+.venv
