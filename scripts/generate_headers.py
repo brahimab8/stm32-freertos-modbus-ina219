@@ -6,7 +6,7 @@ Reads protocol.json plus per-sensor JSON metadata from a directory and
 auto-generates C headers and sensor-defaults C files.
 
 Usage:
-    python generate_headers.py --meta <metadata_dir> --out <output_inc_dir>
+    python generate_headers.py --meta <metadata_dir> --out <project_core_dir>
 
 Arguments:
     --meta    Path to a folder containing:
@@ -15,7 +15,7 @@ Arguments:
     --out     Destination directory for generated .h/.c files
 
 Example:
-    python3 scripts/generate_headers.py --meta metadata --out Core/Inc
+    python3 scripts/generate_headers.py --meta metadata --out Core
 """
 import os
 import json
@@ -75,7 +75,9 @@ def gen_protocol(proto, out_dir):
         lines.append("")
 
     # write out
-    out_h = os.path.join(out_dir, "protocol.h")
+    inc_dir = os.path.join(out_dir, "Inc")
+    os.makedirs(inc_dir, exist_ok=True)
+    out_h = os.path.join(inc_dir, "protocol.h")
     with open(out_h, "w") as f:
         f.write("\n".join(lines))
     print(f"Wrote {out_h}")
@@ -116,7 +118,9 @@ def gen_sensor_config(meta, out_dir):
     hdr.append(f"extern {struct} {sc}_defaults;")
     hdr.append("")
 
-    out_h = os.path.join(out_dir, f"{sc}_config.h")
+    inc_dir = os.path.join(out_dir, "Inc")
+    os.makedirs(inc_dir, exist_ok=True)
+    out_h = os.path.join(inc_dir, f"{sc}_config.h")
     with open(out_h, "w") as f:
         f.write("\n".join(hdr))
     print(f"Wrote {out_h}")
@@ -133,7 +137,9 @@ def gen_sensor_config(meta, out_dir):
     src.append("};")
     src.append("")
 
-    out_c = os.path.join(out_dir, f"{sc}_config.c")
+    src_dir = os.path.join(out_dir, "Src")
+    os.makedirs(src_dir, exist_ok=True)
+    out_c = os.path.join(src_dir, f"{sc}_config.c")
     with open(out_c, "w") as f:
         f.write("\n".join(src))
     print(f"Wrote {out_c}")
