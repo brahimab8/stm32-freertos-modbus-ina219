@@ -1,0 +1,47 @@
+{
+  "constants": {
+    "SOF_MARKER":             170,
+    "STATUS_OK":              0,
+    "STATUS_ERROR":           1,
+    "TICK_BYTES":             4,
+    "QUEUE_DEPTH":            10,
+    "CHECKSUM_LENGTH":        1
+  },
+
+  "commands": {
+    "CMD_READ_SAMPLES":     0,
+    "CMD_ADD_SENSOR":       1,
+    "CMD_REMOVE_SENSOR":    2,
+    "CMD_SET_PERIOD":       3,
+    "CMD_SET_MASK":         4,
+    "CMD_SET_GAIN":         5,
+    "CMD_SET_RANGE":        6,
+    "CMD_SET_CAL":          7
+  },
+
+  "frames": {
+    "command": {
+      "description": "Master → node: always 6 bytes",
+      "fields": [
+        { "name": "sof",      "type": "uint8" },
+        { "name": "board_id", "type": "uint8" },
+        { "name": "addr7",    "type": "uint8" },
+        { "name": "cmd",      "type": "uint8", "enum": "commands" },
+        { "name": "param",    "type": "uint8" },
+        { "name": "checksum", "type": "uint8" }
+      ]
+    },
+
+    "response_header": {
+      "description": "Node → master: 6 + N bytes + Checksum",
+      "fields": [
+        { "name": "sof",      "type": "uint8" },
+        { "name": "board_id", "type": "uint8" },
+        { "name": "addr7",    "type": "uint8" },
+        { "name": "cmd",      "type": "uint8" },
+        { "name": "status",   "type": "uint8" },
+        { "name": "length",   "type": "uint8" }      
+      ]
+    }
+  }
+}
