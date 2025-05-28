@@ -105,10 +105,12 @@ if (task) {
 }
 ```
 
-
 ### Memory Usage Notes
 
 The Sensor Manager increases heap usage due to dynamic allocation of sensor contexts, tasks, and queues. To support this, the heap size in `FreeRTOSConfig.h` was raised from **3000** to **8192 bytes**.
+
+> 📌 **Persistent change:**
+> Open the `.ioc` in CubeIDE → **Middleware → FREERTOS → FREERTOS** → **Config parameters** tab → find **`configTOTAL_HEAP_SIZE`** (default `3000`) → set to `8192` → **Generate Code**.
 
 * **Baseline (no sensors):** \~7192 bytes free
 * **Each INA219 sensor:** \~1050 bytes used
@@ -119,7 +121,7 @@ The Sensor Manager increases heap usage due to dynamic allocation of sensor cont
 | 1       | \~6168 bytes |                                       |
 | 2       | \~5088 bytes |                                       |
 | 6       | \~768 bytes  | Near limit with 8 KB heap             |
-| 8       | -            | overflow                              |
+| 8       | –            | overflow                              |
 
 > 💡 You can increase the heap to **10 KB or more** if needed to support additional sensors.
 
