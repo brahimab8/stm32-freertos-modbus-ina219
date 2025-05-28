@@ -161,3 +161,12 @@ SensorTaskHandle_t *SensorManager_GetTask(SensorManager_t *mgr, uint8_t addr7) {
     }
     return NULL;
 }
+
+uint8_t SensorManager_GetCount(SensorManager_t *mgr) {
+    return mgr ? mgr->count : 0;
+}
+
+SM_Entry_t *SensorManager_GetByIndex(SensorManager_t *mgr, uint8_t index) {
+    if (!mgr || index >= mgr->count) return NULL;
+    return &mgr->entries[index];
+}

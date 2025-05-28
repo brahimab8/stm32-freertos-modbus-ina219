@@ -115,7 +115,39 @@ SM_Status_t SensorManager_SetPeriod(SensorManager_t *mgr,
                                     uint8_t          addr7,
                                     uint32_t         new_period_ms);
 
-/** Lookup the SensorTaskHandle_t* for a given 7-bit addr (or NULL). */
+/**
+ * @brief Retrieve the SensorTask handle for a given sensor address.
+ *
+ * This function returns the SensorTaskHandle_t* associated with a specific
+ * 7-bit I²C address, or NULL if the address is not registered.
+ *
+ * @param mgr   Pointer to the SensorManager instance.
+ * @param addr7 7-bit I²C address of the sensor.
+ * @return SensorTaskHandle_t* for the sensor, or NULL if not found.
+ */
 SensorTaskHandle_t *SensorManager_GetTask(SensorManager_t *mgr, uint8_t addr7);
+
+/**
+ * @brief Get the number of active sensors managed by the SensorManager.
+ *
+ * This function returns how many sensor entries are currently registered
+ * and managed by the given SensorManager instance.
+ *
+ * @param mgr Pointer to the SensorManager instance.
+ * @return Number of active sensors (0 if mgr is NULL).
+ */
+uint8_t SensorManager_GetCount(SensorManager_t *mgr);
+
+/**
+ * @brief Get a pointer to a sensor entry by its index.
+ *
+ * This function returns a pointer to the internal SM_Entry_t structure
+ * at the specified index. Use this to inspect sensor metadata or task handles.
+ *
+ * @param mgr   Pointer to the SensorManager instance.
+ * @param index Index of the sensor (must be < SensorManager_GetCount()).
+ * @return Pointer to the SM_Entry_t entry, or NULL if invalid.
+ */
+SM_Entry_t *SensorManager_GetByIndex(SensorManager_t *mgr, uint8_t index);
 
 #endif // SENSOR_MANAGER_H
