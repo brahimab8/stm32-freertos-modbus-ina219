@@ -63,9 +63,6 @@ const osThreadAttr_t defaultTask_attributes = {
 };
 /* USER CODE BEGIN PV */
 static SensorManager_t *mgr;
-static const uint8_t    initial_addrs[] = { 0x40, 0x41};
-#define NUM_INITIAL_SENSORS  (sizeof(initial_addrs)/sizeof(initial_addrs[0]))
-
 static volatile uint8_t rx_byte;    // volatile storage
 static uint8_t          rx_temp;    // non-volatile buffer
 static osMutexId_t      busMutex;   // shared I²C mutex
@@ -236,18 +233,6 @@ int main(void)
   defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
- // tell the manager to start each INA219
- for (uint8_t i = 0; i < NUM_INITIAL_SENSORS; ++i) {
-     if (SensorManager_AddByType(
-           mgr,
-           SENSOR_TYPE_INA219,
-           initial_addrs[i],
-           SENSOR_DEFAULT_POLL_PERIOD
-         ) != SM_OK)
-     {
-       Error_Handler();
-     }
- }
 
   /* USER CODE END RTOS_THREADS */
 
