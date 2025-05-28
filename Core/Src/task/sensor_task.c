@@ -81,7 +81,7 @@ SensorTaskHandle_t *SensorTask_Create(const SensorDriver_t *driver,
 
     osThreadAttr_t attr = {
         .name       = "SensorTask",
-        .stack_size = 512,
+        .stack_size = 128 * 4, // 512 bytes
         .priority   = osPriorityBelowNormal
     };
     h->thread = osThreadNew(thread_fn, h, &attr);
@@ -143,4 +143,8 @@ void SensorTask_UpdatePeriod(SensorTaskHandle_t *h, uint32_t period_ms)
         return;
     }
     h->period_ms = period_ms;
+}
+
+osThreadId_t SensorTask_GetThread(SensorTaskHandle_t *h) {
+    return h ? h->thread : NULL;
 }

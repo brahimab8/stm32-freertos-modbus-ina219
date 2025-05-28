@@ -1,11 +1,16 @@
 {
   "constants": {
     "SOF_MARKER":             170,
-    "STATUS_OK":              0,
-    "STATUS_ERROR":           1,
     "TICK_BYTES":             4,
     "QUEUE_DEPTH":            10,
     "CHECKSUM_LENGTH":        1
+  },
+
+  "status_codes": {
+    "STATUS_OK":              0,
+    "STATUS_ERROR":           1,
+    "STATUS_NOT_FOUND":       2, 
+    "STATUS_UNKNOWN_CMD":     3 
   },
 
   "commands": {
