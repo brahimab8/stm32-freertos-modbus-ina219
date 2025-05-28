@@ -71,8 +71,8 @@ void CommandTask(void *argument) {
             case CMD_ADD_SENSOR: {
                 uint8_t status = SensorManager_AddByType(
                     mgr,
-                    SENSOR_TYPE_INA219,
-                    cmd.addr7,
+                    cmd.param,             // sensor type from UART frame
+                    cmd.addr7,             // I²C address
                     SENSOR_DEFAULT_POLL_PERIOD
                 );
                 send_status_response(&cmd, status);
