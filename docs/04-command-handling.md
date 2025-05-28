@@ -18,7 +18,7 @@ A small module to format all outgoing packets:
 * **Status-only** (no payload)
 * **Sample list** (tick + data\[] repeated)
 
-**API** (in `utils/response_builder.h`):
+It lives in `utils/response_builder.{h,c}` and exposes:
 
 ```c
 size_t ResponseBuilder_BuildStatus(uint8_t *buf,
@@ -51,64 +51,36 @@ HAL_UART_Transmit(&huart1, txbuf, len, HAL_MAX_DELAY);
 
 Centralizes all command handling off the ISR:
 
-* **Queue**: `cmdQueue = xQueueCreate(8, sizeof(COMMAND_t));`
-* **Task**: `osThreadNew(CommandTask, mgr, &attrs);`
+* **CMD\_READ\_SAMPLES**: lookup task via `SensorManager_GetTask()`, call `SensorTask_ReadSamples()`, then `BuildSamples()`.
+* **CMD\_ADD\_SENSOR**, **CMD\_REMOVE\_SENSOR**, **CMD\_SET\_PERIOD**, **CMD\_SET\_GAIN**, **CMD\_SET\_RANGE**, **CMD\_SET\_CAL**: call the matching `SensorManager_*()` routine, then `BuildStatus()`.
+* **default**: send `STATUS_UNKNOWN_CMD`.
 
-```c
-void CommandTask(void *arg) {
-  COMMAND_t cmd;
-  while (xQueueReceive(cmdQueue, &cmd, portMAX_DELAY) == pdPASS) {
-    switch (cmd.cmd) {
-      case CMD_READ_SAMPLES:
-        // read via SensorManager_GetTask, call BuildSamples
-        break;
-      case CMD_ADD_SENSOR:
-      case CMD_REMOVE_SENSOR:
-      case CMD_SET_PERIOD:
-      case CMD_SET_GAIN:
-      case CMD_SET_RANGE:
-      case CMD_SET_CAL:
-        // call SensorManager_* routines and send status
-        break;
-      default:
-        // send STATUS_UNKNOWN_CMD
-        break;
-    }
-  }
-}
-```
-
-* Keeps all business logic out of the ISR.
+* Keeps all logic out of the ISR.
 * Easily extendable for new commands.
 
 ---
 
 ### 3. Integration in `main.c`
 
-1. **Kick off RX** in `USER CODE BEGIN 2` (after queue & task are ready):
+1. **Enable full-assert** in the .ioc (**Project → Code Generator → “Use full assert”**) and regenerate.
+2. In `main()` (USER CODE blocks):
 
-   ```c
-   HAL_UART_Receive_IT(&huart1, &rx_temp, 1);
-   ```
-2. **Create queue & task**:
+   * Create the command queue & task:
 
-   ```c
-   cmdQueue = xQueueCreate(8, sizeof(COMMAND_t));
-   osThreadNew(CommandTask, mgr, &cmdTaskAttr);
-   ```
-3. **Initial sensors** remain static for now:
+     ```c
+     cmdQueue = xQueueCreate(8, sizeof(COMMAND_t));
+     osThreadNew(CommandTask, mgr, &cmdTaskAttr);
+     ```
+   * Kick off UART RX:
 
-   ```c
-   for (int i = 0; i < NUM_INITIAL_SENSORS; ++i)
-     SensorManager_AddByType(mgr, SENSOR_TYPE_INA219, initial_addrs[i], SENSOR_DEFAULT_POLL_PERIOD);
-   ```
-4. **ISR** enqueues into `cmdQueue`; `CommandTask` dequeues and calls the Response Builder.
+     ```c
+     HAL_UART_Receive_IT(&huart1, &rx_temp, 1);
+     ```
+3. **Removed old manual additions** (`initial_addrs[]`) is removed once we wire ADD/RMV-commands. The `CommandTask` now calls `SensorManager_AddByType()` / `SensorManager_Remove()` at runtime.
 
 ---
 
-### 4. Error Handling & Asserts
-
-* **Enable full-assert** in `.ioc` → **Code Generator** → **Use full assert** → regenerate.
+### 4. Error Handling, Asserts & Runtime Debug
 
 * In `main.c`’s `USER CODE` blocks, print over UART2:
 
@@ -133,21 +105,32 @@ void CommandTask(void *arg) {
   #endif
   ```
 
-* Use `assert_param()` in application code to catch bad inputs at runtime.
+And in the **defaultTask**, we already print per-task stack watermarks and free‐heap once per second under `#ifdef DEBUG`.  Over the ST-LINK’s virtual COM port (e.g. via PuTTY), you’ll see something like:
+
+```
+[Sensor 0] stack left: 200 bytes
+[Sensor 1] stack left: 200 bytes
+[CmdTask] stack left: 176 bytes
+[Sys] Free heap: 4192 bytes
+```
 
 ---
 
-### 5. Client Usage
+### 5. Client Usage (CLI Tester)
 
 Run the CLI wrapper to exercise the full get­-sensor-readings flow over UART:
 
 ```bash
-python tools/sensor_master.py COM3 1 0x40 ina219
+python scripts/get_sensor_readings.py COM3 1 0x40 read
+python scripts/get_sensor_readings.py COM3 1 0x40 add ina219
+python scripts/get_sensor_readings.py COM3 1 0x40 period 500
+python scripts/get_sensor_readings.py COM3 1 0x40 gain 2
 ```
 
 Under the hood it calls your framed `send_command(...)`, then `recv_packet(...)` and `parse_samples(...)` to print each tick+payload.
 
 ### Next Steps
 
-* **Dynamic sensor list**: Replace the static `initial_addrs[]` with runtime `ADD`/`REMOVE` support in `CommandTask`.
-* **Full command coverage**: Implement and test all `CMD_*` cases end-to-end.
+* **Dynamic sensor list**: your `CommandTask` now implements ADD & RMV—remove the old static array in `main.c`.
+* **Full command coverage**: test all `CMD_*` cases end-to-end, confirm gain/range/cal actually change the INA219 readings.
+* **Extend to new sensors**: drop additional `*.json` metadata & driver code and the CLI will pick them up automatically.
