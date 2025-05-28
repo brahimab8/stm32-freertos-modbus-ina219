@@ -51,6 +51,12 @@ def gen_protocol(proto, out_dir):
     lines.append(f"#define CMD_FRAME_SIZE sizeof(COMMAND_t)")
     lines.append("")
 
+    # status_codes
+    lines.append("// Status codes")
+    for k, v in proto.get("status_codes", {}).items():
+        lines.append(f"#define {k:<20} {v}")
+    lines.append("")
+
     # commands
     lines.append("// Command codes")
     for k, v in proto.get("commands", {}).items():
