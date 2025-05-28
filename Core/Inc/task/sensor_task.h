@@ -5,8 +5,8 @@
 #include "stm32l4xx_hal.h"
 #include <stdint.h>
 
-/** Maximum payload bytes per sample (must be ≥ largest SENSOR_PAYLOAD_SIZE_<SENSOR>) */
-#define SENSOR_MAX_PAYLOAD  16
+/** Maximum payload bytes per sample*/
+#define SENSOR_MAX_PAYLOAD  8
 
 /** Raw sample from a sensor, with timestamp and payload bytes. */
 typedef struct {
@@ -97,5 +97,10 @@ uint8_t SensorTask_GetSampleSize(const SensorTaskHandle_t *h);
  */
 void SensorTask_UpdatePeriod(SensorTaskHandle_t *h, uint32_t period_ms);
 
+/**
+ * @brief   Expose thread handle.
+ * @param   h           SensorTask handle 
+ */
+osThreadId_t SensorTask_GetThread(SensorTaskHandle_t *h);
 
 #endif // SENSOR_TASK_H
