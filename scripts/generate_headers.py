@@ -47,8 +47,8 @@ def gen_protocol(proto, out_dir):
     for k, v in proto.get("constants", {}).items():
         lines.append(f"#define {k:<20} {v}")
     lines.append("")
-    lines.append("// Size of response header before the trailing checksum")
     lines.append("#define RESPONSE_HEADER_LENGTH  offsetof(RESPONSE_HEADER_t, length) + 1")
+    lines.append(f"#define CMD_FRAME_SIZE sizeof(COMMAND_t)")
     lines.append("")
 
     # commands

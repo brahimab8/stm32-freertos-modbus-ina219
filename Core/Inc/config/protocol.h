@@ -7,12 +7,14 @@
 #define SOF_MARKER           170
 #define STATUS_OK            0
 #define STATUS_ERROR         1
+#define STATUS_NOT_FOUND     2
+#define STATUS_UNKNOWN_CMD   3
 #define TICK_BYTES           4
 #define QUEUE_DEPTH          10
 #define CHECKSUM_LENGTH      1
 
-// Size of response header before the trailing checksum
 #define RESPONSE_HEADER_LENGTH  offsetof(RESPONSE_HEADER_t, length) + 1
+#define CMD_FRAME_SIZE sizeof(COMMAND_t)
 
 // Command codes
 #define CMD_READ_SAMPLES     0
