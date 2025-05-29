@@ -135,14 +135,13 @@ def test_ping_returns_status(monkeypatch):
     status = m.ping(5)
     assert status == protocol.status_codes['STATUS_UNKNOWN_CMD']
 
-def test_list_sensors_returns_addresses(monkeypatch):
+def test_list_sensors(monkeypatch):
     m = core_mod.SensorMaster(port="P4", baud=9600, timeout=0.1)
 
-    # Simulate payload: list of I²C addresses (e.g., 0x10, 0x20, 0x30)
-    sensor_addresses = [0x10, 0x20, 0x30]
-    payload = bytes(sensor_addresses)
+    # Simulate payload of interleaved type_code and addr bytes
+    payload = bytes([0x01, 0x10, 0x02, 0x20, 0x03, 0x30])  # (type_code, addr) pairs
 
-    # Stub _execute to return OK status with this payload
+    # Stub _execute to return OK with the fake payload
     monkeypatch.setattr(
         m, "_execute",
         lambda board_id, addr, cmd, param=0: (
@@ -152,5 +151,23 @@ def test_list_sensors_returns_addresses(monkeypatch):
         )
     )
 
+    # Stub name_from_type to provide readable names for each type_code
+    monkeypatch.setattr(
+        core_mod.registry, "name_from_type",
+        lambda t: {
+            0x01: "ina219",
+            0x02: "bme280",
+            0x03: "tmp102"
+        }[t]
+    )
+
     result = m.list_sensors(board_id=1)
-    assert result == sensor_addresses
+
+    # Expect names and hex addresses
+    expected = [
+        ("ina219", "0x10"),
+        ("bme280", "0x20"),
+        ("tmp102", "0x30")
+    ]
+
+    assert result == expected

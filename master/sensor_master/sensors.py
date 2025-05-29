@@ -13,6 +13,7 @@ class SensorRegistry:
 
     def _load(self):
         self._types = {}           # name → type code
+        self._reverse_types = {}   # type code → name   ← add this
         self._payload_sizes = {}   # name → total payload size
         self._metadata = {}        # name → full JSON metadata
         for fn in os.listdir(SENSORS_DIR):
@@ -22,7 +23,9 @@ class SensorRegistry:
             meta = json.load(open(path))
             name = meta['name'].lower()
             self._metadata[name] = meta
-            self._types[name] = protocol.sensors[name]
+            type_code = protocol.sensors[name]
+            self._types[name] = type_code
+            self._reverse_types[type_code] = name
             size = sum(f['size'] for f in meta['payload_fields'])
             self._payload_sizes[name] = size
 
@@ -35,6 +38,9 @@ class SensorRegistry:
     def metadata(self, name: str) -> dict:
         """Return the raw JSON metadata for sensor `name`."""
         return self._metadata[name.lower()]
+
+    def name_from_type(self, type_code: int) -> str:
+        return self._reverse_types.get(type_code, f"unknown({type_code})")
 
     def available(self):
         """List all known sensor type names."""

@@ -54,19 +54,12 @@ void CommandTask(void *argument) {
                 SM_MAX_SENSORS
             );
 
-            // extract the addr7 field into a byte array
-            uint8_t addr_list[SM_MAX_SENSORS];
-            for (uint8_t i = 0; i < n; ++i) {
-                addr_list[i] = list_entries[i].addr7;
-            }
-
-            // build a response whose payload is those n addresses
             size_t len = ResponseBuilder_BuildList(
                 txbuf,
-                cmd.addr7,          // echo back the I²C addr from the request
-                CMD_LIST_SENSORS,   // the command we’re responding to
-                STATUS_OK,          // always OK if we got this far
-                addr_list,
+                cmd.addr7,
+                CMD_LIST_SENSORS,
+                STATUS_OK,
+                list_entries,
                 n
             );
 

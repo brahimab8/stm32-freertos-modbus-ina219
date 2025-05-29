@@ -74,9 +74,9 @@ class BoardManager:
         """
         return self.select(board_id).ping()
 
-    def list_sensors(self, board_id: int) -> list[int]:
+    def list_sensors(self, board_id: int) -> list[tuple[str, str]]:
         """
-        Returns all active I²C addresses on the given board.
+        Returns a list of (sensor_type_name, hex_addr) on the given board.
         """
         return self._sm.list_sensors(board_id)
 
@@ -125,5 +125,5 @@ class _BoundMaster:
     def set_cal(self, addr: int, code: int):
         return self._sm.set_cal(self._bid, addr, code)
 
-    def list_sensors(self) -> list[int]:
+    def list_sensors(self) -> list[tuple[str, str]]:
         return self._sm.list_sensors(self._bid)

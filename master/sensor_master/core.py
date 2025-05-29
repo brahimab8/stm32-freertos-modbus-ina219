@@ -204,15 +204,24 @@ class SensorMaster:
         _, _, _, status, _ = self._execute(board_id, 0x00, cmd, 0)
         return status
 
-    def list_sensors(self, board_id: int) -> list[int]:
+    def list_sensors(self, board_id: int) -> list[tuple[str, str]]:
         """
-        Ask the board to list all active I²C addresses it’s managing.
-        Returns a list of addr7 (0x01–0x7F) bytes.
+        Returns a list of (sensor_type_name, hex_addr) strings.
         """
         cmd = protocol.commands['CMD_LIST_SENSORS']
-        # we use addr=0x00 and param=0 for a pure board-level cmd
         _, _, _, status, payload = self._execute(board_id, 0x00, cmd, 0)
+
         if status != protocol.status_codes['STATUS_OK']:
             raise RuntimeError(f'LIST_SENSORS failed: {status}')
-        # payload is just a sequence of addr7 bytes
-        return list(payload)
+
+        if len(payload) % 2 != 0:
+            raise ValueError("Invalid LIST_SENSORS payload length")
+
+        result = []
+        for i in range(0, len(payload), 2):
+            type_code = payload[i]
+            addr7     = payload[i + 1]
+            name      = registry.name_from_type(type_code)
+            result.append((name, f"0x{addr7:02X}"))
+
+        return result

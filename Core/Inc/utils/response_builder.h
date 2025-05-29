@@ -38,16 +38,16 @@ size_t ResponseBuilder_BuildSamples(
  * @param addr7     The I²C address field from the original command
  * @param cmd       The command opcode (CMD_LIST_SENSORS)
  * @param status    STATUS_OK or STATUS_ERROR
- * @param addrs     Pointer to an array of uint8_t addresses
- * @param count     Number of entries in `addrs[]` (≤ SM_MAX_SENSORS)
- * @return          Total length of the frame (header + payload + checksum), or 0 on error
+ * @param entries   Pointer to array of SM_Entry_t (sensor type + addr7)
+ * @param count     Number of entries
+ * @return          Total frame length (header + payload + checksum), or 0 on error
  */
 size_t ResponseBuilder_BuildList(
     uint8_t *outbuf,
     uint8_t addr7,
     uint8_t cmd,
     uint8_t status,
-    const uint8_t *addrs,
+    const SM_Entry_t *entries,
     uint8_t count
 );
 
