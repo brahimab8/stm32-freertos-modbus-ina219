@@ -40,6 +40,11 @@ void CommandTask(void *argument) {
 
         switch (cmd.cmd) {
 
+            case CMD_PING: {
+                send_status_response(&cmd, STATUS_OK);
+                break;
+            }
+
             case CMD_READ_SAMPLES: {
                 SensorTaskHandle_t *task = SensorManager_GetTask(mgr, cmd.addr7);
                 if (!task) {
