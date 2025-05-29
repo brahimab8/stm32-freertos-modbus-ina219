@@ -142,7 +142,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *h) {
             uint8_t checksum    = frame_buf[5];
             uint8_t calc_chk    = board_id ^ addr7 ^ cmd ^ param;
 
-            if (checksum == calc_chk) {
+            if (checksum == calc_chk && board_id == BOARD_ID) {
                 // pack into struct on stack; queue will copy its bytes
                 COMMAND_t packet;
                 packet.sof       = frame_buf[0];
