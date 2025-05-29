@@ -44,6 +44,9 @@ class FakeSM:
     def set_cal(self, board_id, addr, code):
         return self._execute(board_id, addr, protocol.commands['CMD_SET_CAL'], code)
 
+    def list_sensors(self, board_id):
+        return self._execute(board_id, 0x00, protocol.commands['CMD_LIST_SENSORS'], 0)
+
 @pytest.fixture(autouse=True)
 def patch_sm(monkeypatch):
     fake = FakeSM()
@@ -113,3 +116,12 @@ def test_boundmaster_forwards_all_methods():
         protocol.commands['CMD_SET_CAL'],
     }
     assert seen_cmds == expected
+
+def test_boardmanager_list_sensors_forwards():
+    mgr = BoardManager(port="X", baud=1, timeout=1)
+    fake = mgr._sm
+
+    # simulate a successful list_sensors call
+    result = mgr.list_sensors(6)
+    assert result == (None, None, None, protocol.status_codes['STATUS_OK'], b'')
+    assert fake.calls[-1] == (6, 0x00, protocol.commands['CMD_LIST_SENSORS'], 0)

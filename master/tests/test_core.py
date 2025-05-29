@@ -134,3 +134,23 @@ def test_ping_returns_status(monkeypatch):
     # new signature is ping(board_id)
     status = m.ping(5)
     assert status == protocol.status_codes['STATUS_UNKNOWN_CMD']
+
+def test_list_sensors_returns_addresses(monkeypatch):
+    m = core_mod.SensorMaster(port="P4", baud=9600, timeout=0.1)
+
+    # Simulate payload: list of I²C addresses (e.g., 0x10, 0x20, 0x30)
+    sensor_addresses = [0x10, 0x20, 0x30]
+    payload = bytes(sensor_addresses)
+
+    # Stub _execute to return OK status with this payload
+    monkeypatch.setattr(
+        m, "_execute",
+        lambda board_id, addr, cmd, param=0: (
+            board_id, addr, cmd,
+            protocol.status_codes['STATUS_OK'],
+            payload
+        )
+    )
+
+    result = m.list_sensors(board_id=1)
+    assert result == sensor_addresses
