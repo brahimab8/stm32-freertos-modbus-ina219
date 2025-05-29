@@ -10,7 +10,8 @@ import time
 #  “print usage” helper
 def print_usage_and_exit():
     print("Usage: sensor_master.py <tty> <board_id> <addr7> "
-          "<read|add|rmv|period|gain|range|cal> [value_or_type]\n")
+          "<ping|read|add|rmv|period|gain|range|cal> [value_or_type]\n")
+    print("  <ping>            no extra parameter, check board liveness (unused addr)")
     print("  <read>            no extra parameter, just dump samples")
     print("  <add>             value_or_type = sensor type (e.g. ina219)")
     print("  <rmv>             no extra parameter, just remove by addr")
@@ -33,6 +34,7 @@ def print_usage_and_exit():
     print()
 
     print("Examples:")
+    print("  python scripts/get_sensor_readings.py COM3 1 0x40 ping")
     print("  python scripts/get_sensor_readings.py COM3 1 0x40 read")
     print("  python scripts/get_sensor_readings.py COM3 1 0x40 add ina219")
     print("  python scripts/get_sensor_readings.py COM3 1 0x40 period 500")
@@ -71,6 +73,7 @@ CMD_SET_PERIOD = proto["commands"]["CMD_SET_PERIOD"]
 CMD_SET_GAIN   = proto["commands"]["CMD_SET_GAIN"]
 CMD_SET_RANGE  = proto["commands"]["CMD_SET_RANGE"]
 CMD_SET_CAL    = proto["commands"]["CMD_SET_CAL"]
+CMD_PING         = proto["commands"]["CMD_PING"]
 
 # Status codes
 STATUS_OK       = proto["status_codes"]["STATUS_OK"]
@@ -97,7 +100,7 @@ for fn in os.listdir(SENSORS_DIR):
 SENSOR_TYPE_CODES = { name.lower(): code for name, code in proto["sensors"].items() }
 
 # ————————————————————————————————————————————————————————————————————————————
-def open_port(port="/dev/ttyUSB0", baud=115200, timeout=1):
+def open_port(port="COM3", baud=115200, timeout=1):
     return serial.Serial(port, baud, timeout=timeout)
 
 def read_exact(ser, n):
@@ -211,6 +214,9 @@ def main():
     elif cmd_str == "cal":
         cmd = CMD_SET_CAL
         param = int(sys.argv[5], 0)
+    elif cmd_str == "ping":
+        cmd, param = CMD_PING, 0
+
     else:  # default to read
         cmd, param = CMD_READ_SAMPLES, 0
 
