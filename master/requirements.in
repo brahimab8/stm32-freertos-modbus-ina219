@@ -1,0 +1,8 @@
+pyserial>=3.5
+flask>=2.0
+click>=8.0
+PyQt5>=5.15
+
+# for development
+pytest>=8.0
+pytest-cov>=6.0

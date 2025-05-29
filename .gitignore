@@ -19,4 +19,16 @@ build/
 .project
 .vscode/
 
-.venv
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Virtualenv
+venv/
+.venv/
+
+# IDE/workspace
+*.iml
+.vscode/
+*.swp
