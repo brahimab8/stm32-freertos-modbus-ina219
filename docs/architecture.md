@@ -102,3 +102,27 @@ sequenceDiagram
 ---
 
 With this RS-485-ready framing, multiple STM32 nodes can share the same bus, each keyed by `BoardID`, and the host script simply toggles DE/RE and sends these frames.
+
+## 5. Python Master Tools (CLI)
+
+A **Python** layer under `master/` provides:
+
+* **`BoardManager`** → scans boards, returns a **`_BoundMaster`** for per-board calls
+* **`SensorMaster`** → low-level framing, checksum, serial I/O
+* **`SensorRegistry`** → loads sensor metadata (names, type-codes, payload schemas)
+* A **Click-based CLI** (`sensor-cli`) driving everything
+
+```mermaid
+flowchart LR
+    subgraph CLI
+      A[sensor-cli <cmd>]  
+      B[Click handler]
+    end
+    subgraph PythonCore
+      C[BoardManager] --> D[_BoundMaster] --> E[SensorMaster]
+      E -->|serial frames| F[RS-485 Bus]
+      C -->|uses| G[SensorRegistry]
+    end
+
+    A --> B --> C
+```
