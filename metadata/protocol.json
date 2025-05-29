@@ -22,7 +22,9 @@
     "CMD_SET_GAIN":         5,
     "CMD_SET_RANGE":        6,
     "CMD_SET_CAL":          7,
-    "CMD_PING":             8
+    "CMD_PING":             8,
+    "CMD_LIST_SENSORS":     9
+
   },
 
   "sensors": {

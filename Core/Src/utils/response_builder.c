@@ -62,3 +62,43 @@ size_t ResponseBuilder_BuildSamples(
     outbuf[total_len - 1] = chk;
     return total_len;
 }
+
+size_t ResponseBuilder_BuildList(
+    uint8_t       *outbuf,
+    uint8_t        addr7,
+    uint8_t        cmd,
+    uint8_t        status,
+    const uint8_t *addrs,
+    uint8_t        count
+) {
+    if (!outbuf || (count > SM_MAX_SENSORS)) return 0;
+
+    // total payload length = 1 (count) + count addresses
+    uint8_t payload_len = 1 + count;
+    size_t  total_len   = RESPONSE_HEADER_LENGTH + payload_len + CHECKSUM_LENGTH;
+
+    // fill header
+    RESPONSE_HEADER_t hdr = {
+        .sof      = SOF_MARKER,
+        .board_id = BOARD_ID,
+        .addr7    = addr7,
+        .cmd      = cmd,
+        .status   = status,
+        .length   = payload_len
+    };
+    memcpy(outbuf, &hdr, RESPONSE_HEADER_LENGTH);
+
+    // payload
+    size_t off = RESPONSE_HEADER_LENGTH;
+    outbuf[off++] = count;
+    if (count) {
+        memcpy(&outbuf[off], addrs, count);
+        off += count;
+    }
+
+    // checksum over bytes [1 .. total_len-2]
+    uint8_t chk = xor_checksum(outbuf, 1, (int)(total_len - 2));
+    outbuf[total_len - 1] = chk;
+
+    return total_len;
+}

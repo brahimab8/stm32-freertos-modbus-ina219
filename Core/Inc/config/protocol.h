@@ -28,6 +28,7 @@
 #define CMD_SET_RANGE        6
 #define CMD_SET_CAL          7
 #define CMD_PING             8
+#define CMD_LIST_SENSORS     9
 
 // Sensor type codes
 #define SENSOR_TYPE_INA219   1

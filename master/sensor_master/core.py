@@ -203,3 +203,16 @@ class SensorMaster:
         cmd = protocol.commands['CMD_PING']
         _, _, _, status, _ = self._execute(board_id, 0x00, cmd, 0)
         return status
+
+    def list_sensors(self, board_id: int) -> list[int]:
+        """
+        Ask the board to list all active I²C addresses it’s managing.
+        Returns a list of addr7 (0x01–0x7F) bytes.
+        """
+        cmd = protocol.commands['CMD_LIST_SENSORS']
+        # we use addr=0x00 and param=0 for a pure board-level cmd
+        _, _, _, status, payload = self._execute(board_id, 0x00, cmd, 0)
+        if status != protocol.status_codes['STATUS_OK']:
+            raise RuntimeError(f'LIST_SENSORS failed: {status}')
+        # payload is just a sequence of addr7 bytes
+        return list(payload)
