@@ -66,9 +66,16 @@ make flash  # Flash via ST-LINK
 
 ---
 
-## Usage
-- To-Do
-- 
+## Usage (Python CLI)
+
+A cross-platform Python interface lives in the `master/` folder:
+
+* Scans RS-485 boards
+* Adds/removes/configures I²C sensors
+* Reads sensor data
+* Offers both **scriptable commands** and an **interactive shell**
+
+More in [`docs/05-master-tools.md`](docs/05-master-tools.md)
 
 ---
 
