@@ -32,7 +32,7 @@ flowchart LR
   CmdTask -->|API calls| SensorMgr
   SensorMgr -->|manage & arbitrate| I2C_Bus1
   DebugTask -->|stack/heap logs| USART2
-````
+```
 
 Commands arrive framed over RS-485 into the CommandTask, get dispatched to the I²C Bus Manager, which controls SensorTasks for periodic sampling and reports status via the debug console.
 
@@ -91,4 +91,8 @@ The SensorMaster core library can support multiple frontends: CLI, GUI, or web-b
 * **Data retrieval & config**: `read`, `gain`, `range`, `calib`
 * **Interactive mode**: `session`
 
-```
+
+---
+
+[Home](index.md) • [Return (Overview)](project-overview.md) • [Next (Protocol)](protocol.md)
+

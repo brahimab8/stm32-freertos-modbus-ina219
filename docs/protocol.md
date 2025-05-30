@@ -185,3 +185,7 @@ See [docs/add-sensor.md](docs/add-sensor.md) for a step-by-step guide:
    python scripts/generate_headers.py --meta metadata --out firmware/.../Core
    ```
 4. Implement driver code in `firmware/.../Drivers` and update `driver_registry.c`.
+
+---
+
+[Home](index.md) • [Return (Architecture)](architecture.md) • [Next (Resource Usage)](ressource-usage.md)

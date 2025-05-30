@@ -86,3 +86,6 @@ No sensors:
   * Reduce `QUEUE_DEPTH` or stack sizes.
 
 ---
+
+[Home](index.md) • [Return  (Protocol)](protocol.md) • [Next (Add a new sensor)](Add-sensor.md)
+

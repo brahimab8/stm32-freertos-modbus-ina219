@@ -171,3 +171,6 @@ Implement `bmp280_init_ctx()` to populate `ctx->hi2c` and `ctx->addr8`, and opti
 ---
 
 You’re now fully integrated. All layers—from JSON metadata through framing, HAL, RTOS tasks, up to the Python CLI—will automatically handle your new sensor.
+
+---
+[Home](index.md) • [Return (Resource Usage)](ressource-usage.md)
