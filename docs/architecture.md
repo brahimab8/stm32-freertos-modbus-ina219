@@ -6,7 +6,7 @@ This document outlines the key modules, data flows, and RTOS task structure of t
 
 ## 1. High-Level Block Diagram
 
-![High-Level Block Diagram](./images/block_diagram.svg)
+![High-Level Block Diagram](./images/block_diagram.png)
 
 Commands arrive framed over RS-485 into the CommandTask, get dispatched to the I²C Bus Manager, which controls SensorTasks for periodic sampling and reports status via the debug console.
 
@@ -27,7 +27,7 @@ Commands arrive framed over RS-485 into the CommandTask, get dispatched to the I
 
 ## 3. Data-Flow Sequence
 
-![Data-Flow Sequence](./images/seq_diagram.svg)
+![Data-Flow Sequence](./images/seq_diagram.png)
 
 ---
 

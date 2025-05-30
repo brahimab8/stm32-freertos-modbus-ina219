@@ -58,7 +58,7 @@ Hardware I/O is fully mocked.
 ---
 ## 5. Core Class Diagram
 
-![Class Diagram](./images/master_class_diagram.svg)
+![Class Diagram](./images/master_class_diagram.png)
 
 ---
 ## 6. Future improvements
