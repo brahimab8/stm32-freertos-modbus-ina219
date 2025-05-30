@@ -27,8 +27,8 @@ The STM32 I²C Sensor Hub is designed as a scalable gateway for managing multipl
 * **Robust RS-485 framing** with SOF marker + XOR checksum
 * **FreeRTOS-based architecture**: per-sensor tasks with FIFO queues and shared I²C mutex
 * **Modular split**: independent `firmware/` and `master/` domains
-* **Extensible protocol**: variable payload lengths and dynamic commands
-* **Python CLI**: full end-to-end control, including interactive sessions
+* **Extensible protocol**: variable payload lengths and dynamic commands (Full protocol spec in [docs/protocol.md](docs/protocol.md)).
+* **Python CLI**: full end-to-end control, including interactive sessions.
 
 ## Key Benefits
 
