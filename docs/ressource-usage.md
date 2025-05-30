@@ -87,5 +87,5 @@ No sensors:
 
 ---
 
-[Home](index.md) • [Return  (Protocol)](protocol.md) • [Next (Add a new sensor)](Add-sensor.md)
+[Home](index.md) • [Return  (Protocol)](protocol.md) • [Next (Add a new sensor)](add-sensor.md)
 
