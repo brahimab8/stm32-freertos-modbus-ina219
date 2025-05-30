@@ -6,33 +6,7 @@ This document outlines the key modules, data flows, and RTOS task structure of t
 
 ## 1. High-Level Block Diagram
 
-```mermaid
-flowchart LR
-  subgraph Host - PC
-    direction TB
-    SM["SensorMaster core<br>(framing, parsing)"]
-    CLI["Frontends: sensor-cli / GUI / Web"]
-    SM --> CLI
-  end
-
-  subgraph MCU - STM32 Node
-    direction TB
-    CmdTask["CommandTask<br>(UART1/RS-485 framing & dispatch)"]
-    SensorMgr["SensorManager<br>(manage sensor tasks sharing an I²C Bus)"]
-    subgraph I2C_Bus1["I²C Bus 1"]
-      direction TB
-      SensorTask["SensorTask<br>(periodic sampling)"]
-      ExternalSensor["External Sensor Device"]
-      SensorTask -->|I²C read/write| ExternalSensor
-    end
-    DebugTask["DefaultTask<br>(USART2 debug console)"]
-  end
-
-  CLI ---|RS-485 UART1| CmdTask
-  CmdTask -->|API calls| SensorMgr
-  SensorMgr -->|manage & arbitrate| I2C_Bus1
-  DebugTask -->|stack/heap logs| USART2
-```
+![High-Level Block Diagram](images/block_diagram.svg)
 
 Commands arrive framed over RS-485 into the CommandTask, get dispatched to the I²C Bus Manager, which controls SensorTasks for periodic sampling and reports status via the debug console.
 
@@ -53,28 +27,7 @@ Commands arrive framed over RS-485 into the CommandTask, get dispatched to the I
 
 ## 3. Data-Flow Sequence
 
-```mermaid
-sequenceDiagram
-    participant Host as SensorMaster core
-    participant CT as CommandTask
-    participant SM as I²C Bus Manager
-    participant ST as SensorTask
-    participant I2C as I²C Bus
-
-    Host->>CT: send [SOF, boardID, addr7, cmd, param, csum]
-    CT->>CT: collect frame, verify SOF + XOR checksum
-    CT->>SM: enqueue COMMAND_t to manager queue
-    CT-->>Host: send STATUS or payload via ResponseBuilder
-
-    alt READ_SAMPLES
-      SM->>ST: SensorTask_ReadSamples(addr7)
-      ST-->>SM: return SensorSample_t[]
-      SM-->>CT: ResponseBuilder_BuildSamples(txbuf...)
-      CT-->>Host: transmit framed response
-    end
-
-    Note over ST,I2C: SensorManager ensures orderly I²C access under busMutex
-```
+![Data-Flow Sequence](images/seq_diagram.svg)
 
 ---
 
