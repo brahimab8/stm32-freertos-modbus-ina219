@@ -11,7 +11,7 @@
 ```bash
 git clone https://github.com/brahimab8/stm32-i2c-sensor-hub.git
 cd stm32-i2c-sensor-hub/firmware/stm32-i2c-sensor-hub
-````
+```
 
 1. **Pre-build step** (Project → Properties → Build → Pre-build):
 
@@ -48,12 +48,27 @@ sensor-cli --help
 
 ## Documentation
 
-* [Overview](docs/project-overview.md)
-* [01 – Quick Setup](docs/01-setup.md)
-* [02 – Sensor Task](docs/02-sensor-task.md)
-* [03 – Sensor Tasks Manager](docs/03-sensor-manager.md)
-* [04 – Command & Response Handling](docs/04-command-handling.md)
-* [05 – Master Tools (CLI)](docs/05-master-tools.md)
+* [Project overview](docs/project-overview.md)  
+* [Architecture](docs/architecture.md)  
+* [Protocol](docs/protocol.md)  
+* [Resource Usage & Debug Output](docs/resource-usage.md)  
+
+### Tutorials
+1. [Quick Setup](docs/01-setup.md)  
+2. [Sensor Task](docs/02-sensor-task.md)  
+3. [Sensor Tasks Manager](docs/03-sensor-manager.md)  
+4. [Command & Response Handling](docs/04-command-handling.md)  
+5. [Master Tools (CLI)](docs/05-master-tools.md)  
+
+---
+
+## Next Steps
+
+- **Qt GUI frontend** for a desktop monitoring/control app  
+- **Support additional sensor types** (SPI, analog, digital) beyond I²C  
+- **Generated driver logic**: user-filled JSON → sensor driver/manager code  
+- **Scheduled commands**: master-side scheduler thread + queue for timed or recurring reads/operations over RS-485  
+- **Persistent storage**: log data on master (e.g. SQLite)  
 
 ---
 
