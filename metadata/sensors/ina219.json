@@ -1,12 +1,124 @@
 {
+  "$schema": "http://json-schema.org/draft-07/schema#",
   "name": "ina219",
+  "interface": "i2c",
+
   "config_defaults": {
     "gain":        "INA219_GAIN_8_320MV",
     "bus_range":   "INA219_BVOLTAGERANGE_32V",
     "calibration": 4096
   },
+
+  "config_fields": [
+    {
+      "name":        "gain",
+      "getter_cmd":  "CMD_GET_GAIN",
+      "setter_cmd":  "CMD_SET_GAIN",
+      "type":        "uint8",
+      "size":        1,
+      "reg_addr":    0,
+      "mask":        "0x1800",
+      "shift":       11,
+      "endian":      "big",
+      "driver_side": true,
+      "values": {
+        "INA219_GAIN_1_40MV":  0,
+        "INA219_GAIN_2_80MV":  1,
+        "INA219_GAIN_4_160MV": 2,
+        "INA219_GAIN_8_320MV": 3
+      }
+    },
+    {
+      "name":        "bus_range",
+      "getter_cmd":  "CMD_GET_RANGE",
+      "setter_cmd":  "CMD_SET_RANGE",
+      "type":        "uint8",
+      "size":        1,
+      "reg_addr":    0,
+      "mask":        "0x2000",
+      "shift":       13,
+      "endian":      "big",
+      "driver_side": true,
+      "values": {
+        "INA219_BVOLTAGERANGE_16V": 0,
+        "INA219_BVOLTAGERANGE_32V": 1
+      }
+    },
+    {
+      "name":        "calib",
+      "getter_cmd":  "CMD_GET_CAL",
+      "setter_cmd":  "CMD_SET_CAL",
+      "type":        "uint16",
+      "size":        2,
+      "reg_addr":    5,
+      "mask":        "0xFFFF",
+      "shift":       0,
+      "endian":      "big",
+      "driver_side": true
+    },
+    {
+      "name":        "all",
+      "getter_cmd":  "CMD_GET_CONFIG",
+      "setter_cmd":  null,
+      "type":        "uint8[4]",
+      "size":        4,
+      "reg_addr":    null,
+      "mask":        null,
+      "shift":       null,
+      "endian":      null,
+      "driver_side": true
+    }
+  ],
+
   "payload_fields": [
-    { "name": "bus_voltage_mV", "type": "uint16", "size": 2 },
-    { "name": "current_uA",     "type": "int32",  "size": 4 }
+    {
+      "name":         "bus_voltage_mV",
+      "type":         "uint16",
+      "size":         2,
+      "reg_addr":     2,
+      "mask":         "0xFFFE",
+      "shift":        3,
+      "scale_factor": 4,
+      "endian":       "big",
+      "source":       null
+    },
+    {
+      "name":         "shunt_voltage_uV",
+      "type":         "int16",
+      "size":         2,
+      "reg_addr":     1,
+      "mask":         "0xFFFF",
+      "shift":        0,
+      "scale_factor": 10,
+      "endian":       "big",
+      "source":       null
+    },
+    {
+      "name":         "current_uA",
+      "type":         "int32",
+      "size":         4,
+      "reg_addr":     4,
+      "mask":         "0xFFFF",
+      "shift":        0,
+      "scale_factor": 1,
+      "endian":       "big",
+      "source":       null
+    },
+    {
+      "name":         "power_mW",
+      "type":         "uint16",
+      "size":         2,
+      "reg_addr":     3,
+      "mask":         "0xFFFF",
+      "shift":        0,
+      "scale_factor": 20,
+      "endian":       "big",
+      "source":       null
+    }
+  ],
+
+  "default_payload_fields": [
+    "bus_voltage_mV",
+    "current_uA"
   ]
 }

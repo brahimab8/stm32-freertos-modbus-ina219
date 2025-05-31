@@ -1,0 +1,179 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Sensor Metadata Schema",
+  "description": "Defines the structure of each <sensor>.json file in metadata/sensors/, accommodating I²C, SPI, analog, and GPIO interfaces.",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "The unique sensor name (matches driver/module names)."
+    },
+    "interface": {
+      "type": "string",
+      "enum": ["i2c", "spi", "analog", "gpio"],
+      "description": "Bus or interface type that this sensor uses."
+    },
+    "config_defaults": {
+      "type": "object",
+      "description": "Default values for any config_fields or driver-side defaults.",
+      "additionalProperties": true
+    },
+    "config_fields": {
+      "type": "array",
+      "description": "List of sensor configuration fields (registers or driver-side parameters).",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Field name (e.g. \"gain\", \"bus_range\")."
+          },
+          "getter_cmd": {
+            "type": "string",
+            "description": "Protocol command to read this field (e.g. \"CMD_GET_GAIN\")."
+          },
+          "setter_cmd": {
+            "type": ["string", "null"],
+            "description": "Protocol command to write this field (if writable); null if read-only."
+          },
+          "type": {
+            "type": "string",
+            "description": "C-type or array (e.g. \"uint8\", \"uint16\", \"uint8[4]\")."
+          },
+          "size": {
+            "type": "integer",
+            "description": "Number of bytes returned by the getter or expected by setter."
+          },
+          "reg_addr": {
+            "type": ["integer", "null"],
+            "minimum": 0,
+            "maximum": 255,
+            "description": "Register address (0x00–0xFF) if driver-side; null if not register-mapped."
+          },
+          "mask": {
+            "type": "string",
+            "pattern": "^0x[0-9A-Fa-f]+$",
+            "description": "Hex mask to extract bits from the register (e.g. \"0x1800\")."
+          },
+          "shift": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Number of bits to right-shift after masking."
+          },
+          "endian": {
+            "type": "string",
+            "enum": ["big", "little"],
+            "description": "Endianness for multi-byte fields."
+          },
+          "driver_side": {
+            "type": "boolean",
+            "description": "If true, this field lives in the sensor’s chip or hardware; false = purely software/RTOS-side."
+          }
+        },
+        "required": ["name", "getter_cmd", "type", "size", "driver_side"],
+        "if": {
+          "properties": { "driver_side": { "const": true } }
+        },
+        "then": {
+          "required": ["reg_addr", "mask", "shift", "endian"],
+          "properties": {
+            "reg_addr": { "type": "integer", "minimum": 0, "maximum": 255 },
+            "mask":     { "type": "string", "pattern": "^0x[0-9A-Fa-f]+$" },
+            "shift":    { "type": "integer", "minimum": 0 },
+            "endian":   { "type": "string", "enum": ["big", "little"] }
+          }
+        },
+        "else": {
+          "properties": {
+            "reg_addr": { "type": "null" },
+            "mask":     { "type": ["string", "null"] },
+            "shift":    { "type": ["integer", "null"] },
+            "endian":   { "type": ["string", "null"] }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "payload_fields": {
+      "type": "array",
+      "description": "List of fields returned by each sensor ‘read_samples’ operation.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Payload field name (e.g. \"bus_voltage_mV\")."
+          },
+          "type": {
+            "type": "string",
+            "description": "C-type string (e.g. \"uint16\", \"int32\")."
+          },
+          "size": {
+            "type": "integer",
+            "description": "Number of bytes in that field."
+          },
+          "reg_addr": {
+            "type": ["integer", "null"],
+            "minimum": 0,
+            "maximum": 255,
+            "description": "Register address (chip-side) if register-mapped; null for non-register sources."
+          },
+          "mask": {
+            "type": ["string", "null"],
+            "pattern": "^0x[0-9A-Fa-f]+$",
+            "description": "Hex mask to apply to the raw register value; null if not applicable."
+          },
+          "shift": {
+            "type": ["integer", "null"],
+            "minimum": 0,
+            "description": "Number of bits to right-shift after masking; null if not applicable."
+          },
+          "scale_factor": {
+            "type": "number",
+            "description": "Factor to multiply (post-shift) raw value to compute final units."
+          },
+          "endian": {
+            "type": ["string", "null"],
+            "enum": ["big", "little", null],
+            "description": "Endianness for multi-byte payload fields; null if single-byte or not applicable."
+          },
+          "source": {
+            "type": ["string", "null"],
+            "description": "Optional – indicates an alternate data source (e.g. \"ADC\", \"SPI\")."
+          }
+        },
+        "required": ["name", "type", "size", "scale_factor"],
+        "if": {
+          "properties": { "reg_addr": { "type": "integer" } }
+        },
+        "then": {
+          "required": ["reg_addr", "mask", "shift", "endian"],
+          "properties": {
+            "reg_addr":    { "type": "integer", "minimum": 0, "maximum": 255 },
+            "mask":        { "type": "string", "pattern": "^0x[0-9A-Fa-f]+$" },
+            "shift":       { "type": "integer", "minimum": 0 },
+            "endian":      { "type": "string", "enum": ["big", "little"] }
+          }
+        },
+        "else": {
+          "properties": {
+            "reg_addr": { "type": "null" },
+            "mask":     { "type": ["string", "null"] },
+            "shift":    { "type": ["integer", "null"] },
+            "endian":   { "type": ["string", "null"] }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "default_payload_fields": {
+      "type": "array",
+      "description": "List of payload_fields names that should be read by default.",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": ["name", "interface", "config_defaults", "config_fields", "payload_fields"],
+  "additionalProperties": false
+}
