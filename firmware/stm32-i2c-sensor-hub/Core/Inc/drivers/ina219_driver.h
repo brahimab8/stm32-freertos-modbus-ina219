@@ -1,25 +1,32 @@
-#ifndef INA219_DRIVER_H
-#define INA219_DRIVER_H
+/* Auto-generated ina219_driver.h; do not edit! */
+#pragma once
 
-#include "task/sensor_task.h"   /**< SensorDriver_t, SensorSample_t */
-#include "drivers/ina219.h"     /**< Low-level INA219 HAL wrapper */
-#include "stm32l4xx_hal.h"      /**< I2C_HandleTypeDef */
+#include "task/sensor_task.h"  /**< SensorDriver_t, SensorSample_t */
+#include "driver_registry.h"   /**< SensorRegistry_Register */
+#include "drivers/ina219.h"        /**< HAL-level wrapper */
+#include "stm32l4xx_hal.h"       /**< I2C_HandleTypeDef */
 #include <stdint.h>
+#include <stdbool.h>
 
-/**
- * @brief   Context for an INA219 sensor instance.
- * @details Holds the I²C handle and 8-bit address (7-bit << 1).
- */
-typedef struct {
-    I2C_HandleTypeDef *hi2c;   /**< Pointer to initialized I2C bus handle */
-    uint16_t           addr8;  /**< 8-bit I²C address of the INA219 */
-} INA219_Ctx_t;
+// ---------------- Public callbacks ----------------
+void ina219_init_ctx(void *vctx, I2C_HandleTypeDef *hi2c, uint8_t addr7);
+bool ina219_configure(void *vctx, uint8_t field_id, uint8_t value);
+bool ina219_read_config(void *vctx, uint8_t field_id, uint8_t *value);
 
-/**
- * @brief   Retrieve the SensorDriver_t v-table for INA219.
- * @note    The returned static v-table uses INA219_Ctx_t as its context.
- * @return  Pointer to SensorDriver_t with .init/.read callbacks and sample_size.
- */
+// vtable getter:
 const SensorDriver_t *INA219_GetDriver(void);
 
-#endif // INA219_DRIVER_H
+// Register this driver into the global registry:
+void ina219_RegisterDriver(void);
+
+/**
+ * @brief   Context for a sensor instance.
+ */
+typedef struct {
+    I2C_HandleTypeDef *hi2c;      /**< I2C handle */
+    uint16_t           addr8;     /**< 8-bit I²C address */
+    INA219_GAIN_t gain;
+    INA219_BUS_RANGE_t bus_range;
+    INA219_CALIBRATION_t calibration;
+    uint8_t payload_mask;   /**< which payload bits are enabled */
+} INA219_Ctx_t;

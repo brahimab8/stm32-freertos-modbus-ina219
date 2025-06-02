@@ -34,6 +34,8 @@
 #define CMD_GET_RANGE        12
 #define CMD_GET_CAL          13
 #define CMD_GET_CONFIG       14
+#define CMD_SET_PAYLOAD_MASK 15
+#define CMD_GET_PAYLOAD_MASK 16
 
 // Sensor type codes
 #define SENSOR_TYPE_INA219   1
