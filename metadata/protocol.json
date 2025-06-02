@@ -24,13 +24,13 @@
     "CMD_SET_CAL":          7,
     "CMD_PING":             8,
     "CMD_LIST_SENSORS":     9,
-    "CMD_GET_PERIOD":    10,
-    "CMD_GET_GAIN":      11,
-    "CMD_GET_RANGE":     12,
-    "CMD_GET_CAL":       13,
-    "CMD_GET_CONFIG":    14
-
-
+    "CMD_GET_PERIOD":       10,
+    "CMD_GET_GAIN":         11,
+    "CMD_GET_RANGE":        12,
+    "CMD_GET_CAL":          13,
+    "CMD_GET_CONFIG":       14,
+    "CMD_SET_PAYLOAD_MASK": 15,
+    "CMD_GET_PAYLOAD_MASK": 16
   },
 
   "sensors": {
