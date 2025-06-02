@@ -1,11 +1,10 @@
-{
+{  
   "$schema": "http://json-schema.org/draft-07/schema#",
   "name": "ina219",
-  "interface": "i2c",
 
   "config_defaults": {
-    "gain":        "INA219_GAIN_8_320MV",
-    "bus_range":   "INA219_BVOLTAGERANGE_32V",
+    "gain":        3,
+    "bus_range":   1,
     "calibration": 4096
   },
 
@@ -20,13 +19,7 @@
       "mask":        "0x1800",
       "shift":       11,
       "endian":      "big",
-      "driver_side": true,
-      "values": {
-        "INA219_GAIN_1_40MV":  0,
-        "INA219_GAIN_2_80MV":  1,
-        "INA219_GAIN_4_160MV": 2,
-        "INA219_GAIN_8_320MV": 3
-      }
+      "driver_side": true
     },
     {
       "name":        "bus_range",
@@ -38,14 +31,10 @@
       "mask":        "0x2000",
       "shift":       13,
       "endian":      "big",
-      "driver_side": true,
-      "values": {
-        "INA219_BVOLTAGERANGE_16V": 0,
-        "INA219_BVOLTAGERANGE_32V": 1
-      }
+      "driver_side": true
     },
     {
-      "name":        "calib",
+      "name":        "calibration",
       "getter_cmd":  "CMD_GET_CAL",
       "setter_cmd":  "CMD_SET_CAL",
       "type":        "uint16",
@@ -76,11 +65,10 @@
       "type":         "uint16",
       "size":         2,
       "reg_addr":     2,
-      "mask":         "0xFFFE",
+      "mask":         "0x1FFF",
       "shift":        3,
       "scale_factor": 4,
-      "endian":       "big",
-      "source":       null
+      "endian":       "big"
     },
     {
       "name":         "shunt_voltage_uV",
@@ -90,19 +78,17 @@
       "mask":         "0xFFFF",
       "shift":        0,
       "scale_factor": 10,
-      "endian":       "big",
-      "source":       null
+      "endian":       "big"
     },
     {
       "name":         "current_uA",
-      "type":         "int32",
-      "size":         4,
+      "type":         "int16",
+      "size":         2,
       "reg_addr":     4,
       "mask":         "0xFFFF",
       "shift":        0,
       "scale_factor": 1,
-      "endian":       "big",
-      "source":       null
+      "endian":       "big"
     },
     {
       "name":         "power_mW",
@@ -112,13 +98,9 @@
       "mask":         "0xFFFF",
       "shift":        0,
       "scale_factor": 20,
-      "endian":       "big",
-      "source":       null
+      "endian":       "big"
     }
   ],
 
-  "default_payload_fields": [
-    "bus_voltage_mV",
-    "current_uA"
-  ]
+  "default_payload_bits": [0, 1]
 }
