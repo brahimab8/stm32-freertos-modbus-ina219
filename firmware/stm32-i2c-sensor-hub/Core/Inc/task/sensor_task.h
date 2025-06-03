@@ -4,9 +4,10 @@
 #include "cmsis_os.h"
 #include "stm32l4xx_hal.h"
 #include <stdint.h>
+#include <stdbool.h>
 
 /** Maximum payload bytes per sample*/
-#define SENSOR_MAX_PAYLOAD  8
+#define SENSOR_MAX_PAYLOAD  10
 
 /** Raw sample from a sensor, with timestamp and payload bytes. */
 typedef struct {
@@ -37,6 +38,18 @@ typedef struct {
 
     /** Number of payload bytes produced by this driver on each read. */
     uint8_t sample_size;
+
+    /**
+     * @brief   Get the sensor config values.
+     * @param   ctx      Opaque driver context.
+     * @param   field_id   Driver-local field ID.
+     * @param   out_value  Pointer to a uint8_t to receive the value.
+     * @return  HAL_OK if read succeeded, HAL_ERROR otherwise.
+     */
+    bool        (*read_config)(void *ctx,
+                            uint8_t field_id,
+                            uint8_t *out_value);
+
 
 } SensorDriver_t;
 

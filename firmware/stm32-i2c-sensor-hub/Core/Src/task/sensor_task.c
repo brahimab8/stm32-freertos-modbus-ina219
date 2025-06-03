@@ -1,5 +1,4 @@
 #include "task/sensor_task.h"
-#include <stdlib.h>
 #include <string.h>
 
 struct SensorTaskHandle_t {
