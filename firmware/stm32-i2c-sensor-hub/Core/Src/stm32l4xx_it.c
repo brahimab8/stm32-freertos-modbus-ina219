@@ -22,6 +22,8 @@
 #include "stm32l4xx_it.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <stdio.h>
+#include <string.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -51,6 +53,67 @@
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+extern UART_HandleTypeDef huart2; // for debug output
+
+static void print_uint32_hex(uint32_t v)
+{
+    char buf[11];
+    snprintf(buf, sizeof(buf), "0x%08lX", (unsigned long)v);
+    HAL_UART_Transmit(&huart2, (uint8_t*)buf, (uint16_t)strlen(buf), HAL_MAX_DELAY);
+}
+
+void HardFault_Handler_C(uint32_t *stacked_frame)
+{
+    // stacked_frame[6] == stacked PC
+    uint32_t fault_pc = stacked_frame[6];
+    uint32_t stacked_lr = stacked_frame[5];
+    uint32_t stacked_sp = (uint32_t)stacked_frame;
+
+    // Read System Control Block registers
+    uint32_t cfsr = SCB->CFSR;  // Configurable Fault Status Register
+    uint32_t hfsr = SCB->HFSR;  // HardFault Status Register
+
+    // Print a header
+    const char *msg1 = "\r\n--- HARDFAULT ---\r\n";
+    HAL_UART_Transmit(&huart2, (uint8_t*)msg1, (uint16_t)strlen(msg1), HAL_MAX_DELAY);
+
+    // Print stacked PC
+    const char *pc_text = " stacked PC = ";
+    HAL_UART_Transmit(&huart2, (uint8_t*)pc_text, (uint16_t)strlen(pc_text), HAL_MAX_DELAY);
+    print_uint32_hex(fault_pc);
+    const char *crlf = "\r\n";
+    HAL_UART_Transmit(&huart2, (uint8_t*)crlf, (uint16_t)strlen(crlf), HAL_MAX_DELAY);
+
+    // Print stacked LR
+    const char *lr_text = " stacked LR = ";
+    HAL_UART_Transmit(&huart2, (uint8_t*)lr_text, (uint16_t)strlen(lr_text), HAL_MAX_DELAY);
+    print_uint32_hex(stacked_lr);
+    HAL_UART_Transmit(&huart2, (uint8_t*)crlf, (uint16_t)strlen(crlf), HAL_MAX_DELAY);
+
+    // Print CFSR
+    const char *cfsr_text = "   CFSR    = ";
+    HAL_UART_Transmit(&huart2, (uint8_t*)cfsr_text, (uint16_t)strlen(cfsr_text), HAL_MAX_DELAY);
+    print_uint32_hex(cfsr);
+    HAL_UART_Transmit(&huart2, (uint8_t*)crlf, (uint16_t)strlen(crlf), HAL_MAX_DELAY);
+
+    // Print HFSR
+    const char *hfsr_text = "   HFSR    = ";
+    HAL_UART_Transmit(&huart2, (uint8_t*)hfsr_text, (uint16_t)strlen(hfsr_text), HAL_MAX_DELAY);
+    print_uint32_hex(hfsr);
+    HAL_UART_Transmit(&huart2, (uint8_t*)crlf, (uint16_t)strlen(crlf), HAL_MAX_DELAY);
+
+    // Optionally, print the stack pointer value
+    const char *sp_text = "   SP      = ";
+    HAL_UART_Transmit(&huart2, (uint8_t*)sp_text, (uint16_t)strlen(sp_text), HAL_MAX_DELAY);
+    print_uint32_hex(stacked_sp);
+    HAL_UART_Transmit(&huart2, (uint8_t*)crlf, (uint16_t)strlen(crlf), HAL_MAX_DELAY);
+
+    // Now loop forever (or reset)
+    while (1)
+    {
+        __NOP();
+    }
+}
 
 /* USER CODE END 0 */
 
@@ -86,7 +149,19 @@ void NMI_Handler(void)
 void HardFault_Handler(void)
 {
   /* USER CODE BEGIN HardFault_IRQn 0 */
+    // On Cortex-M, when a HardFault occurs in thread mode, the CPU pushes registers
+    // onto the stack (PSP).  We can figure out whether the CPU was using PSP or MSP
+    // by examining bit-2 of LR (EXC_RETURN).  In FreeRTOS tasks run under PSP, so:
+    __asm volatile
+    (
+        "TST lr, #4            \n"  // test bit-2 of LR.  If 0 → MSP, if 1 → PSP
+        "ITE EQ                \n"  // if EQ = bit was zero (so MSP in use)
+        "MRSEQ r0, MSP         \n"  //   r0 = MSP
+        "MRSNE r0, PSP         \n"  // else r0 = PSP
+        "B HardFault_Handler_C \n"  // branch to our C handler
+    );
 
+  
   /* USER CODE END HardFault_IRQn 0 */
   while (1)
   {
