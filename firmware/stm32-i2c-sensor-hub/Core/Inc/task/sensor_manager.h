@@ -2,9 +2,9 @@
 #define SENSOR_MANAGER_H
 
 #include "cmsis_os.h"
-#include "stm32l4xx_hal.h"
 #include "task/sensor_task.h"    ///< for SensorTaskHandle_t, SensorSample_t
-#include "config/protocol.h"     ///< for SENSOR_TYPE_… and CMD_… constants
+#include "driver_registry.h" 
+
 #include <stdint.h>
 
 #define SM_MAX_SENSORS  8
@@ -23,6 +23,7 @@ typedef struct {
     uint8_t               sensor_id;   ///< index (0…count-1)
     uint8_t               type_code;   ///< SENSOR_TYPE_INA219, etc.
     uint8_t               addr7;       ///< 7-bit I²C address
+    uint32_t              period_ms;   ///< current poll period (ms)
     const SensorDriver_t *drv;         ///< driver v-table
     void                 *ctx;         ///< driver context (driver-specific)
     SensorTaskHandle_t   *task;        ///< underlying polling task
@@ -77,6 +78,19 @@ SM_Status_t SensorManager_Configure(SensorManager_t *mgr,
                                     uint8_t          addr7,
                                     uint8_t          cmd_id,
                                     uint8_t          param);
+
+/**
+ * @brief   Read back a configuration field from a running sensor.
+ * @param   mgr        Manager handle.
+ * @param   addr7      7-bit I²C address of the sensor.
+ * @param   field_id   Driver-local field ID.
+ * @param   out_value  Pointer to a uint8_t to receive the value.
+ * @return  SM_OK on success; SM_ERROR if not found.
+ */
+SM_Status_t SensorManager_GetConfig(SensorManager_t *mgr,
+                                    uint8_t          addr7,
+                                    uint8_t          field_id,
+                                    uint8_t         *out_value);
 
 /**
  * @brief   Read up to `max_samples` from the sensor’s FIFO.
