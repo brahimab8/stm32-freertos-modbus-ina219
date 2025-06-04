@@ -4,39 +4,38 @@ from pathlib import Path
 import pytest
 import types
 
-SCRIPT = (
-    Path(__file__).parent.parent
+SCRIPTS_DIR = (
+    Path(__file__).parent
+    / ".."
     / "firmware"
     / "stm32-i2c-sensor-hub"
     / "scripts"
-    / "generate_firmware_sources.py"
-)
+).resolve()
 
 
 @pytest.fixture(scope="module")
-def sensor_generators():
+def generator_modules():
     """
-    Dynamically load generate_firmware_sources.py and return its
-    gen_sensor_config(...) and gen_sensor_driver_files(...) functions.
+    Dynamically load config_generator, hal_generator, and generate_sensor_driver modules.
     """
-    # 1) Insert parent of “scripts/” on sys.path
-    scripts_dir = SCRIPT.parent
-    package_root = scripts_dir.parent
+    # 1) Ensure the parent of “scripts/” is on sys.path
+    package_root = SCRIPTS_DIR.parent
     sys.path.insert(0, str(package_root))
 
-    # 1.5) Stub out validate_sensor so that “from .validate_sensor” never fails:
-    dummy = types.ModuleType("scripts.validate_sensor")
-    dummy.validate_all = lambda sensors_path, schema_path: None
-    sys.modules["scripts.validate_sensor"] = dummy
+    mod_map = {}
+    for fname, modname in [
+        ("config_generator.py", "scripts.config_generator"),
+        ("hal_generator.py", "scripts.hal_generator"),
+        ("generate_sensor_driver.py", "scripts.generate_sensor_driver"),
+    ]:
+        path = SCRIPTS_DIR / fname
+        spec = importlib.util.spec_from_file_location(modname, str(path))
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[modname] = module
+        spec.loader.exec_module(module)
+        mod_map[modname.split(".")[-1]] = module
 
-    # 2) Load the module under its package name
-    fullname = "scripts.generate_firmware_sources"
-    spec = importlib.util.spec_from_file_location(fullname, str(SCRIPT))
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[fullname] = module
-    spec.loader.exec_module(module)
-
-    return module.gen_sensor_config, module.gen_sensor_driver_files
+    return mod_map["config_generator"], mod_map["hal_generator"], mod_map["generate_sensor_driver"]
 
 
 @pytest.fixture
@@ -79,8 +78,8 @@ def toy_sensor_meta():
     }
 
 
-def test_gen_sensor_config_creates_expected(tmp_path, toy_sensor_meta, sensor_generators):
-    gen_sensor_config, _ = sensor_generators
+def test_gen_sensor_config_creates_expected(tmp_path, toy_sensor_meta, generator_modules):
+    config_mod, _, _ = generator_modules
 
     # Prepare output directories
     out_dir = tmp_path / "out"
@@ -88,7 +87,7 @@ def test_gen_sensor_config_creates_expected(tmp_path, toy_sensor_meta, sensor_ge
     (out_dir / "Src" / "config").mkdir(parents=True, exist_ok=True)
 
     # Run config generation
-    gen_sensor_config(toy_sensor_meta, str(out_dir))
+    config_mod.gen_sensor_config(toy_sensor_meta, str(out_dir))
 
     sc = "testsensor"  # snake_case("TestSensor")
     # Check header + source
@@ -111,16 +110,45 @@ def test_gen_sensor_config_creates_expected(tmp_path, toy_sensor_meta, sensor_ge
     assert ".gain = 2" in src_text
 
 
-def test_gen_sensor_driver_files_creates_hal_and_driver(tmp_path, toy_sensor_meta, sensor_generators):
-    _, gen_sensor_driver_files = sensor_generators
+def test_gen_sensor_hal_wrapper_creates_hal(tmp_path, toy_sensor_meta, generator_modules):
+    _, hal_mod, _ = generator_modules
 
     # Prepare output dirs
     out_dir = tmp_path / "out"
     (out_dir / "Inc" / "drivers").mkdir(parents=True, exist_ok=True)
     (out_dir / "Src" / "drivers").mkdir(parents=True, exist_ok=True)
 
-    # Run HAL + driver generation
-    gen_sensor_driver_files(toy_sensor_meta, str(out_dir))
+    # Run HAL-wrapper generation
+    hal_mod.gen_sensor_hal_wrapper(toy_sensor_meta, str(out_dir))
+
+    sc = "testsensor"
+    upper = "TESTSENSOR"
+
+    # HAL‐wrapper header + source
+    hal_hdr = out_dir / "Inc" / "drivers" / f"{sc}.h"
+    hal_src = out_dir / "Src" / "drivers" / f"{sc}.c"
+    assert hal_hdr.exists(), f"{hal_hdr} not created"
+    assert hal_src.exists(), f"{hal_src} not created"
+
+    hal_hdr_text = hal_hdr.read_text()
+    # The HAL header must declare a prototype for reading “measurement”
+    assert f"{upper}_ReadMeasurement" in hal_hdr_text
+
+    hal_src_text = hal_src.read_text()
+    # The HAL source must define “TESTSENSOR_ReadMeasurement(...)”
+    assert f"HAL_StatusTypeDef {upper}_ReadMeasurement" in hal_src_text
+
+
+def test_gen_sensor_driver_files_creates_driver(tmp_path, toy_sensor_meta, generator_modules):
+    _, _, driver_mod = generator_modules
+
+    # Prepare output dirs
+    out_dir = tmp_path / "out"
+    (out_dir / "Inc" / "drivers").mkdir(parents=True, exist_ok=True)
+    (out_dir / "Src" / "drivers").mkdir(parents=True, exist_ok=True)
+
+    # Run full driver generation (HAL + driver layer)
+    driver_mod.gen_sensor_driver_files(toy_sensor_meta, str(out_dir))
 
     sc = "testsensor"
     upper = "TESTSENSOR"
@@ -130,14 +158,6 @@ def test_gen_sensor_driver_files_creates_hal_and_driver(tmp_path, toy_sensor_met
     hal_src = out_dir / "Src" / "drivers" / f"{sc}.c"
     assert hal_hdr.exists(), f"{hal_hdr} not created"
     assert hal_src.exists(), f"{hal_src} not created"
-
-    hal_hdr_text = hal_hdr.read_text()
-    # The HAL header should declare a function prototype for reading the measurement:
-    assert f"{upper}_ReadMeasurement" in hal_hdr_text
-
-    hal_src_text = hal_src.read_text()
-    # The HAL source should define that function “TESTSENSOR_ReadMeasurement(...)”
-    assert f"HAL_StatusTypeDef {upper}_ReadMeasurement" in hal_src_text
 
     # 2) Driver‐layer header + source
     drv_hdr = out_dir / "Inc" / "drivers" / f"{sc}_driver.h"
