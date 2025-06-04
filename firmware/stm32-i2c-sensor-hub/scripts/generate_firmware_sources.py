@@ -17,7 +17,8 @@ import argparse
 
 from .validate_sensor import validate_all
 from .generate_protocol import gen_protocol
-from .generate_sensor_driver import gen_sensor_config, gen_sensor_driver_files
+from .config_generator import gen_sensor_config
+from .generate_sensor_driver import gen_sensor_driver_files
 from .driver_registry_helpers import write_driver_registry_includes, write_driver_registry_calls
 
 def main(meta_dir: str, out_dir: str):
