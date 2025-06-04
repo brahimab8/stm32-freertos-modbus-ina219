@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 import cmd
 import shlex
+import time
 
-from sensor_master.boards import BoardManager
 from sensor_master.protocol import protocol
 from sensor_master.sensors import registry
+from sensor_master.backend import SensorBackend, Mode
 
 STATUS_NAMES = {v: k for k, v in protocol.status_codes.items()}
 
@@ -13,33 +14,41 @@ class SensorShell(cmd.Cmd):
     intro = "Entering sensor-cli session. Type help or ? to list commands.\n"
     file = None
 
-    def __init__(self, port, baud):
+    def __init__(self, backend: SensorBackend):
         super().__init__()
-        self.manager = BoardManager(port, baud)
+        # the shared backend drives everything
+        self.backend = backend
         self.current_board = None
         self.current_sensor = None
         self.current_addr = None
 
     @property
     def prompt(self):
-        parts = [f"port={self.manager.port}", f"baud={self.manager.baud}"]
+        parts = [f"port={self.backend.board_mgr.port}",
+                 f"baud={self.backend.board_mgr.baud}"]
         if self.current_board is not None:
             parts.append(f"board={self.current_board}")
         if self.current_sensor and self.current_addr is not None:
             parts.append(f"sensor={self.current_sensor}@0x{self.current_addr:02X}")
         return "[" + " | ".join(parts) + "] > "
 
+    # --- Config / connection commands ---
+
     def do_port(self, arg):
         try:
-            self.manager.port = shlex.split(arg)[0]
+            p = shlex.split(arg)[0]
+            self.backend.board_mgr.port = p
         except Exception as e:
             print("Error setting port:", e)
 
     def do_baud(self, arg):
         try:
-            self.manager.baud = int(shlex.split(arg)[0])
+            b = int(shlex.split(arg)[0])
+            self.backend.board_mgr.baud = b
         except Exception as e:
             print("Error setting baud rate:", e)
+
+    # --- Board & sensor selection ---
 
     def do_board(self, arg):
         try:
@@ -62,29 +71,35 @@ class SensorShell(cmd.Cmd):
         except Exception as e:
             print("Usage: sensor <type> <addr>\nError:", e)
 
-    def do_scan(self, arg):
-        try:
-            boards = self.manager.scan()
-            print("Boards found:", ", ".join(str(b) for b in boards) or "None")
-        except Exception as e:
-            print("Error scanning:", e)
+    # --- Discovery commands ---
 
     def do_ping(self, arg):
+        """Ping the currently selected board: ping"""
         if self.current_board is None:
             print("Select a board first:  board <id>")
             return
         try:
-            status = self.manager.ping(self.current_board)
+            status = self.backend.ping(self.current_board)
             print("PING →", STATUS_NAMES.get(status, status))
         except Exception as e:
             print("Error pinging board:", e)
 
+    def do_scan(self, arg):
+        """Scan for all boards (discovery mode)."""
+        try:
+            info = self.backend.set_mode(Mode.DISCOVERY)
+            boards = list(info.keys())
+            print("Boards found:", ", ".join(str(b) for b in boards) or "None")
+        except Exception as e:
+            print("Error scanning:", e)
+
     def do_list(self, arg):
+        """List sensors on the current board."""
         if self.current_board is None:
             print("Select a board first:  board <id>")
             return
         try:
-            sensors = self.manager.select(self.current_board).list_sensors()
+            sensors = self.backend.list_sensors(self.current_board)
             if not sensors:
                 print("No sensors found")
                 return
@@ -94,119 +109,259 @@ class SensorShell(cmd.Cmd):
         except Exception as e:
             print("Error listing sensors:", e)
 
+    # --- Sensor configuration commands ---
+
     def do_add(self, arg):
+        """Add the current sensor to the current board."""
         if None in (self.current_board, self.current_sensor, self.current_addr):
             print("Select board and sensor first.")
             return
         try:
-            status = self.manager.select(self.current_board).add_sensor(self.current_addr, self.current_sensor)
+            status = self.backend.add_sensor(
+                self.current_board, self.current_addr, self.current_sensor
+            )
             print("ADD →", STATUS_NAMES.get(status, status))
         except Exception as e:
             print("Error adding sensor:", e)
 
     def do_rmv(self, arg):
+        """Remove the current sensor from the board."""
         if None in (self.current_board, self.current_addr):
             print("Select board and sensor first.")
             return
         try:
-            status = self.manager.select(self.current_board).remove_sensor(self.current_addr)
+            status = self.backend.remove_sensor(
+                self.current_board, self.current_addr
+            )
             print("REMOVE →", STATUS_NAMES.get(status, status))
         except Exception as e:
             print("Error removing sensor:", e)
 
-    def do_period(self, arg):
-        if None in (self.current_board, self.current_addr):
-            print("Select board and sensor first.")
-            return
-        try:
-            ms = int(shlex.split(arg)[0])
-            status = self.manager.select(self.current_board).set_period(self.current_addr, ms)
-            print("PERIOD →", STATUS_NAMES.get(status, status))
-        except ValueError:
-            print("Period must be an integer (ms), and a multiple of 100.")
-        except Exception as e:
-            print("Error setting period:", e)
-
-    def do_gain(self, arg):
-        if None in (self.current_board, self.current_addr):
-            print("Select board and sensor first.")
-            return
-        try:
-            code = int(shlex.split(arg)[0])
-            status = self.manager.select(self.current_board).set_gain(self.current_addr, code)
-            print("GAIN →", STATUS_NAMES.get(status, status))
-        except Exception as e:
-            print("Error setting gain:", e)
-
-    def do_range(self, arg):
-        if None in (self.current_board, self.current_addr):
-            print("Select board and sensor first.")
-            return
-        try:
-            code = int(shlex.split(arg)[0])
-            status = self.manager.select(self.current_board).set_range(self.current_addr, code)
-            print("RANGE →", STATUS_NAMES.get(status, status))
-        except Exception as e:
-            print("Error setting range:", e)
-
-    def do_cal(self, arg):
-        if None in (self.current_board, self.current_addr):
-            print("Select board and sensor first.")
-            return
-        try:
-            code = int(shlex.split(arg)[0])
-            status = self.manager.select(self.current_board).set_cal(self.current_addr, code)
-            print("CAL →", STATUS_NAMES.get(status, status))
-        except Exception as e:
-            print("Error setting calibration:", e)
+    # --- Manual read command ---
 
     def do_read(self, arg):
+        """Read one batch of samples from the current sensor."""
         if None in (self.current_board, self.current_addr, self.current_sensor):
             print("Select board and sensor first.")
             return
         try:
-            recs = self.manager.select(self.current_board).read_samples(self.current_addr, self.current_sensor)
+            recs = self.backend.read_samples(
+                self.current_board, self.current_addr, self.current_sensor
+            )
             if not recs:
                 print("No data")
                 return
-            fields = [fld['name'] for fld in registry.metadata(self.current_sensor)['payload_fields']]
+            # print table
+            md = registry.metadata(self.current_sensor)
+            fields = [name for name in [f['name'] for f in md['payload_fields']]
+            if name in recs[0].keys()]
+
             headers = ["tick(ms)"] + fields
             print("\t".join(f"{h:>12}" for h in headers))
             for rec in recs:
-                row = [rec['tick']] + [rec[f] for f in fields]
+                row = [rec['tick']] + [rec.get(f, "") for f in fields]
                 print("\t".join(f"{v:>12}" for v in row))
         except Exception as e:
             print("Error reading samples:", e)
 
-    def do_sensors(self, arg):
+    # --- Streaming commands ---
+
+    def do_stream(self, arg):
+        """
+        Stream all known sensors continuously.
+        Usage: stream [interval_s]
+        """
+        interval = float(shlex.split(arg)[0]) if arg else 1.0
+        print(f"→ Streaming all sensors every {interval}s. Press CTRL-C or 'stop'.")
+        self.backend.start_stream(self._print_cb)
         try:
-            for name in registry.available():
-                md = registry.metadata(name)
-                print(f"{name} → defaults {md.get('config_defaults', {})}")
+            # loop until user interrupts
+            while self.backend.mode == Mode.STREAM:
+                time.sleep(interval)
+        except KeyboardInterrupt:
+            self.backend.stop_stream()
+            print("\n→ Stream stopped.")
+
+    def do_stop(self, arg):
+        """Stop any ongoing stream."""
+        self.backend.stop_stream()
+        print("→ Stream stopped.")
+
+    def _print_cb(self, board, addr, sensor, records):
+        """
+        Called by StreamScheduler for each batch of “records” from one sensor.
+        We only print those payload_fields that actually showed up in rec.
+        """
+        print(f"\n[Board {board} | Sensor {sensor}@0x{addr:02X}] {len(records)} samples")
+        md = registry.metadata(sensor)
+
+        # Build a list of field-names that were actually present in the first record
+        # (all records have the same mask, so checking rec.keys() suffices)
+        for rec in records:
+            # Only include fields that actually appear in `rec`
+            vals = "  ".join(
+                f"{fld['name']}={rec[fld['name']]}"
+                for fld in md['payload_fields']
+                if fld['name'] in rec
+            )
+            print(f"  tick={rec['tick']}ms  {vals}")
+
+    # --- Generalized configuration commands ---
+
+    def do_set_config(self, arg):
+        """Set a configuration field for the current sensor.
+        Usage: set_config <field_name> <value>
+        """
+        if None in (self.current_board, self.current_addr, self.current_sensor):
+            print("Select board and sensor first.")
+            return
+        try:
+            field_name, value = shlex.split(arg)
+            value = int(value, 0)
+            status = self.backend.set_config(
+                self.current_board, self.current_addr, self.current_sensor, field_name, value
+            )
+            print("SET_CONFIG →", STATUS_NAMES.get(status, status))
         except Exception as e:
-            print("Error listing sensor types:", e)
+            print("Error:", e)
+            self._print_config_help()
 
-    def do_quit(self, arg):
-        return True
+    def do_get_config(self, arg):
+        """Get a specific configuration field of the current sensor.
+        Usage: get_config <field_name> OR get_config all
+        """
+        if None in (self.current_board, self.current_addr, self.current_sensor):
+            print("Select board and sensor first.")
+            return
+        args = shlex.split(arg)
+        if not args:
+            print("Usage: get_config <field_name> OR get_config all")
+            self._print_config_help()
+            return
+        field_name = args[0].strip().lower()
+        try:
+            if field_name == "all":
+                self.do_get_all_configs("")
+                return
+            value = self.backend.get_config_field(
+                self.current_board, self.current_addr, self.current_sensor, field_name
+            )
+            print(f"{field_name.upper()} → {value}")
+        except Exception as e:
+            print("Error:", e)
+            self._print_config_help()
 
-    def do_exit(self, arg):
-        return True
+    def do_show_config(self, arg):
+        """Show all available config fields for the current sensor."""
+        if self.current_sensor is None:
+            print("Select a sensor first.")
+            return
+        md = registry.metadata(self.current_sensor)
+        config_fields = md.get('config_fields', [])
+        if not config_fields:
+            print(f"No configurable fields for sensor '{self.current_sensor}'.")
+            return
+        print(f"Config fields for '{self.current_sensor}':")
+        for fld in config_fields:
+            setter = fld.get('setter_cmd', 'None')
+            getter = fld.get('getter_cmd', 'None')
+            print(f"  {fld['name']:15} Getter: {getter:<15} Setter: {setter}")
 
-    def do_EOF(self, arg):
-        return True
+    def _print_config_help(self):
+        """Prints available config fields for the current sensor, with hints."""
+        if not self.current_sensor:
+            print("No sensor selected.")
+            return
+        try:
+            md = registry.metadata(self.current_sensor)
+            print(f"Available config fields for '{self.current_sensor}':")
+            for fld in md.get("config_fields", []):
+                desc = fld.get("description", "").strip()
+                rng  = fld.get("range", "")
+                enum = fld.get("enum_labels", {})
+                print(f"  {fld['name']:15} {desc}")
+                if rng:
+                    print(f"{'':17}Range: {rng}")
+                if enum:
+                    print(f"{'':17}Enums:")
+                    for k, v in enum.items():
+                        print(f"{'':19}{k} → {v.strip()}")
+        except Exception:
+            print("(unable to load metadata)")
 
-    def help_add(self):
-        print("Add the currently selected sensor to the board.")
-        print("Usage: add")
+    def do_get_all_configs(self, arg):
+        """Get all configuration values for the current sensor."""
+        if None in (self.current_board, self.current_addr, self.current_sensor):
+            print("Select board and sensor first.")
+            return
+        try:
+            configs = self.backend.get_all_configs(
+                self.current_board, self.current_addr, self.current_sensor
+            )
+            md = registry.metadata(self.current_sensor)
+            config_fields = {cf["name"]: cf for cf in md.get("config_fields", [])}
+            print("Current Configurations:")
+            for field, value in configs.items():
+                explanation = ""
+                cf = config_fields.get(field)
+                if cf:
+                    enum_map = cf.get("enum_labels")
+                    if enum_map and str(value) in enum_map:
+                        explanation = f"({enum_map[str(value)]})"
+                    elif field == "period":
+                        explanation = f"(polls every {value * 100} ms)"
+                    elif cf.get("description"):
+                        explanation = f"({cf['description']})"
+                print(f"  {field}: {value} {explanation}")
+        except Exception as e:
+            print("Error getting all configs:", e)
 
-    def help_read(self):
-        print("Read samples from the selected sensor. Usage: read")
+    def do_setmask(self, arg):
+        """
+        Set the payload-bitmask (one byte) for the selected sensor.
+        Usage: setmask <mask_int>
+        """
+        if None in (self.current_board, self.current_addr, self.current_sensor):
+            print("Select board and sensor first.")
+            return
+        try:
+            mask = int(shlex.split(arg)[0], 0)
+            if not (0 <= mask <= 0xFF):
+                raise ValueError
+            status = self.backend.set_payload_mask(
+                self.current_board,
+                self.current_addr,
+                mask
+            )
+            print("SET_MASK →", STATUS_NAMES.get(status, status))
+        except Exception as e:
+            print("Error setting payload mask:", e)
 
-    def help_ping(self):
-        print("Ping the currently selected board. Usage: ping")
+    def do_getmask(self, arg):
+        """
+        Query the current payload-bitmask (one byte) for the selected sensor.
+        Usage: getmask
+        """
+        if None in (self.current_board, self.current_addr, self.current_sensor):
+            print("Select board and sensor first.")
+            return
+        try:
+            mask = self.backend.get_payload_mask(
+                self.current_board, self.current_addr
+            )
+            print(f"PAYLOAD_MASK → 0x{mask:02X}")
+        except Exception as e:
+            print("Error getting payload mask:", e)
 
-    def help_list(self):
-        print("List all active sensor addresses on the selected board. Usage: list")
+    # --- Utility commands & exits ---
 
-    def help_rmv(self):
-        print("Remove the selected sensor. Usage: rmv")
+    def do_sensors(self, arg):
+        """List all available sensor types and their defaults."""
+        for name in registry.available():
+            md = registry.metadata(name)
+            print(f"{name} → defaults {md.get('config_defaults', {})}")
+
+    def do_quit(self, arg): return True
+    def do_exit(self, arg): return True
+    def do_EOF(self, arg):  return True
+

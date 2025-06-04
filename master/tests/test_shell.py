@@ -1,9 +1,9 @@
 import pytest
 from sensor_master.protocol import protocol
 from sensor_master.cli.shell import SensorShell
-from sensor_master.core import serial as sm_serial
+from sensor_master.backend import SensorBackend
 
-# DummySerial to prevent actual COM-port access
+# DummySerial to prevent actual COM-port access in SensorBackend
 class DummySerial:
     def __init__(self, port, baud, timeout=None):
         self.port = port
@@ -32,7 +32,18 @@ class DummyMgr:
         return [1,2,3]
     def select(self, bid):
         self.calls.append(('select', bid))
-        return self
+        # Return a bound object that has list_sensors, add_sensor, and ping
+        class Bound:
+            def list_sensors(self_inner):
+                return []  # no sensors
+
+            def add_sensor(self_inner, addr, name):
+                return protocol.status_codes['STATUS_OK']
+
+            def ping(self_inner):
+                return protocol.status_codes['STATUS_OK']
+        return Bound()
+
     def add_sensor(self, addr, name):
         self.calls.append(('add', addr, name))
         return protocol.status_codes['STATUS_OK']
@@ -42,28 +53,38 @@ class DummyMgr:
 
 @pytest.fixture(autouse=True)
 def patch_serial(monkeypatch):
-    # Prevent real serial.Serial from opening ports
-    monkeypatch.setattr(sm_serial, 'Serial', DummySerial)
+    import sensor_master.core as core_mod
+    monkeypatch.setattr(core_mod.serial, 'Serial', DummySerial)
     yield
 
 @pytest.fixture
 def shell(monkeypatch):
-    dummy = DummyMgr()
-    monkeypatch.setattr(
-        'sensor_master.cli.shell.BoardManager',
-        lambda port, baud: dummy
-    )
-    return SensorShell('P', 1)
+    dummy_mgr = DummyMgr()
+    fake_backend = SensorBackend(port="X", baud=1, timeout=0.1)
+    fake_backend.board_mgr = dummy_mgr
+    return SensorShell(fake_backend)
 
 def test_scan_command(shell, capsys):
     shell.onecmd('scan')
     out = capsys.readouterr().out
     assert 'Boards found: 1, 2, 3' in out
-    assert ('scan',) in shell.manager.calls
+    assert ('scan',) in shell.backend.board_mgr.calls
+
+def test_add_command(shell, capsys):
+    shell.current_board = 5
+    shell.current_sensor = 'foo'
+    shell.current_addr = 0x10
+
+    shell.onecmd('add')
+    out = capsys.readouterr().out.strip()
+    assert out == "ADD → STATUS_OK"
+    calls = shell.backend.board_mgr.calls
+    assert ('select', 5) in calls
 
 def test_ping_command(shell, capsys):
-    shell.current_board = 5
+    shell.current_board = 4
     shell.onecmd('ping')
-    out = capsys.readouterr().out
-    assert 'PING → STATUS_OK' in out
-    assert ('ping', 5) in shell.manager.calls
+    out = capsys.readouterr().out.strip()
+    assert out == "PING → STATUS_OK"
+    calls = shell.backend.board_mgr.calls
+    assert ('ping', 4) in calls
