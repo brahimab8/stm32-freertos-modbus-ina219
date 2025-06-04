@@ -22,13 +22,25 @@
 #define CMD_READ_SAMPLES     0
 #define CMD_ADD_SENSOR       1
 #define CMD_REMOVE_SENSOR    2
-#define CMD_SET_PERIOD       3
-#define CMD_SET_MASK         4
-#define CMD_SET_GAIN         5
-#define CMD_SET_RANGE        6
-#define CMD_SET_CAL          7
-#define CMD_PING             8
-#define CMD_LIST_SENSORS     9
+#define CMD_PING             3
+#define CMD_LIST_SENSORS     4
+#define CMD_SET_PAYLOAD_MASK 5
+#define CMD_GET_PAYLOAD_MASK 6
+#define CMD_GET_CONFIG       7
+#define CMD_SET_PERIOD       20
+#define CMD_SET_GAIN         21
+#define CMD_SET_RANGE        22
+#define CMD_SET_CAL          23
+#define CMD_GET_PERIOD       30
+#define CMD_GET_GAIN         31
+#define CMD_GET_RANGE        32
+#define CMD_GET_CAL          33
+
+// Command ID ranges
+#define CMD_CONFIG_SETTERS_START       20
+#define CMD_CONFIG_SETTERS_END         29
+#define CMD_CONFIG_GETTERS_START       30
+#define CMD_CONFIG_GETTERS_END         39
 
 // Sensor type codes
 #define SENSOR_TYPE_INA219   1

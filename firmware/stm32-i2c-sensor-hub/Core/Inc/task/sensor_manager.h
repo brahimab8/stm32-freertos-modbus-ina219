@@ -2,9 +2,9 @@
 #define SENSOR_MANAGER_H
 
 #include "cmsis_os.h"
-#include "stm32l4xx_hal.h"
 #include "task/sensor_task.h"    ///< for SensorTaskHandle_t, SensorSample_t
-#include "config/protocol.h"     ///< for SENSOR_TYPE_… and CMD_… constants
+#include "driver_registry.h" 
+
 #include <stdint.h>
 
 #define SM_MAX_SENSORS  8
@@ -23,6 +23,7 @@ typedef struct {
     uint8_t               sensor_id;   ///< index (0…count-1)
     uint8_t               type_code;   ///< SENSOR_TYPE_INA219, etc.
     uint8_t               addr7;       ///< 7-bit I²C address
+    uint32_t              period_ms;   ///< current poll period (ms)
     const SensorDriver_t *drv;         ///< driver v-table
     void                 *ctx;         ///< driver context (driver-specific)
     SensorTaskHandle_t   *task;        ///< underlying polling task
@@ -77,6 +78,19 @@ SM_Status_t SensorManager_Configure(SensorManager_t *mgr,
                                     uint8_t          addr7,
                                     uint8_t          cmd_id,
                                     uint8_t          param);
+
+/**
+ * @brief   Read back a configuration field from a running sensor.
+ * @param   mgr        Manager handle.
+ * @param   addr7      7-bit I²C address of the sensor.
+ * @param   field_id   Driver-local field ID.
+ * @param   out_value  Pointer to a uint8_t to receive the value.
+ * @return  SM_OK on success; SM_ERROR if not found.
+ */
+SM_Status_t SensorManager_GetConfig(SensorManager_t *mgr,
+                                    uint8_t          addr7,
+                                    uint8_t          field_id,
+                                    uint8_t         *out_value);
 
 /**
  * @brief   Read up to `max_samples` from the sensor’s FIFO.
@@ -149,5 +163,22 @@ uint8_t SensorManager_GetCount(SensorManager_t *mgr);
  * @return Pointer to the SM_Entry_t entry, or NULL if invalid.
  */
 SM_Entry_t *SensorManager_GetByIndex(SensorManager_t *mgr, uint8_t index);
+
+
+/**
+ * @brief Look up the sensor driver information for a given I²C address.
+ *
+ * This function searches the SensorManager's list of active sensors to find
+ * the one matching the specified 7-bit I²C address. If found, it returns
+ * a pointer to the corresponding SensorDriverInfo_t structure, which contains
+ * metadata and function pointers for that sensor's driver.
+ *
+ * @param[in] mgr     Pointer to the SensorManager instance.
+ * @param[in] addr7   7-bit I²C address of the sensor.
+ *
+ * @return Pointer to the sensor's SensorDriverInfo_t structure,
+ *         or NULL if not found.
+ */
+const SensorDriverInfo_t *SensorRegistry_FindByAddr(SensorManager_t *mgr, uint8_t addr7);
 
 #endif // SENSOR_MANAGER_H

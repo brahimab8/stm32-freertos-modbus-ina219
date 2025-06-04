@@ -1,0 +1,162 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Sensor Metadata Schema",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "The unique sensor name (matches driver/module names)."
+        },
+    "config_defaults": {
+      "type": "object",
+      "description": "Default values for each configuration field.",
+      "additionalProperties": true
+    },
+    "config_fields": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "getter_cmd": {
+            "type": "string"
+          },
+          "setter_cmd": {
+            "type": ["string", "null"]
+          },
+          "type": {
+            "type": "string"
+          },
+          "size": {
+            "type": "integer"
+          },
+          "reg_addr": {
+            "type": ["integer", "null"],
+            "minimum": 0,
+            "maximum": 255,
+            "description": "Register address (0x00–0xFF) if driver-side; null if not register-mapped."
+          },
+          "mask": {
+            "type": ["string", "null"],
+            "pattern": "^0x[0-9A-Fa-f]+$",
+            "description": "Hex mask to extract bits from the register (e.g. \"0x1800\")."
+          },
+          "shift": {
+            "type": ["integer", "null"],
+            "minimum": 0,
+            "description": "Number of bits to right-shift after masking."
+          },
+          "endian": {
+            "type": ["string", "null"],
+            "enum": ["big", "little", null],
+            "description": "Endianness for multi-byte fields."
+          },
+          "driver_side": {
+            "type": "boolean",
+            "description": "If true, this field lives in the sensor’s chip or hardware; false = purely software/RTOS-side."
+          },
+          "description": { 
+            "type": "string" 
+          },
+          "range":       { 
+            "type": ["string", "null"] 
+          },
+          "enum_labels": {
+            "type": "object",
+            "additionalProperties": { "type": "string" }
+          }
+    },
+
+        "required": ["name", "getter_cmd", "type", "size", "driver_side"],
+        "if": {
+          "properties": { "driver_side": { "const": true } }
+        },
+        "then": {
+          "required": ["reg_addr", "mask", "shift", "endian"]
+        },
+        "else": {
+          "properties": {
+            "reg_addr": { "type": "null" },
+            "mask":     { "type": ["string", "null"] },
+            "shift":    { "type": ["integer", "null"] },
+            "endian":   { "type": ["string", "null"] }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "payload_fields": {
+      "type": "array",
+      "description": "List of fields returned by each sensor ‘read_samples’ operation.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Payload field name (e.g. \"bus_voltage_mV\")."
+          },
+          "type": {
+            "type": "string",
+            "description": "C-type string (e.g. \"uint16\", \"int32\")."
+          },
+          "size": {
+            "type": "integer",
+            "description": "Number of bytes in that field."
+          },
+          "reg_addr": {
+            "type": ["integer", "null"],
+            "minimum": 0,
+            "maximum": 255,
+            "description": "Register address (chip-side) if register-mapped; null for non-register sources."
+          },
+          "mask": {
+            "type": ["string", "null"],
+            "pattern": "^0x[0-9A-Fa-f]+$",
+            "description": "Hex mask to apply to the raw register value; null if not applicable."
+          },
+          "shift": {
+            "type": ["integer", "null"],
+            "minimum": 0,
+            "description": "Number of bits to right-shift after masking; null if not applicable."
+          },
+          "scale_factor": {
+            "type": "number",
+            "description": "Factor to multiply (post-shift) raw value to compute final units."
+          },
+          "endian": {
+            "type": ["string", "null"],
+            "enum": ["big", "little", null],
+            "description": "Endianness for multi-byte payload fields; null if single-byte or not applicable."
+          }
+        },
+        "required": ["name", "type", "size", "scale_factor"],
+        "if": {
+          "properties": { "reg_addr": { "type": "integer" } }
+        },
+        "then": {
+          "required": ["reg_addr", "mask", "shift", "endian"]
+        },
+        "else": {
+          "properties": {
+            "reg_addr": { "type": "null" },
+            "mask":     { "type": ["string", "null"] },
+            "shift":    { "type": ["integer", "null"] },
+            "endian":   { "type": ["string", "null"] }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "default_payload_bits": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      },
+      "description": "Indices of payload_fields to include by default."
+    }
+  },
+  "required": ["name", "config_defaults", "config_fields", "payload_fields"],
+  "additionalProperties": false
+}

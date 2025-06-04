@@ -4,11 +4,12 @@
 #include "drivers/ina219.h"
 
 typedef struct {
-    INA219_Gain_t gain;
-    INA219_BusRange_t bus_range;
-    uint16_t calibration;
-} ina219_config_defaults_t;
+    INA219_PERIOD_t period;
+    INA219_GAIN_t gain;
+    INA219_BUS_RANGE_t bus_range;
+    INA219_CALIBRATION_t calibration;
+} INA219_config_defaults_t;
 
-#define SENSOR_PAYLOAD_SIZE_INA219 6
+#define SENSOR_PAYLOAD_SIZE_INA219 4
 
-extern ina219_config_defaults_t ina219_defaults;
+extern INA219_config_defaults_t ina219_defaults;

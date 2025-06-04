@@ -1,69 +1,65 @@
 import serial
 import struct
-import time
+import threading
+from tqdm import tqdm
+
 from .protocol import protocol
 from .sensors import registry
 
+STATUS_OK = protocol.status_codes['STATUS_OK']
+
 class SensorMaster:
-    def __init__(self,
-                 port: str = 'COM3',
-                 baud: int = 115200,
-                 timeout: float = 1.0):
-        self._port    = port
-        self._baud    = baud
+    """
+    Low-level communication class for sending command frames and parsing responses.
+    """
+
+    def __init__(self, port='COM3', baud=115200, timeout=0.05):
+        self._port = port
+        self._baud = baud
         self._timeout = timeout
+        self._lock = threading.Lock()
+        self._SOF = protocol.constants['SOF_MARKER']
+        self._CK_LEN = protocol.constants['CHECKSUM_LENGTH']
         self._open_serial()
 
-        # protocol constants
-        self._SOF     = protocol.constants['SOF_MARKER']
-        self._TICK_BYTES = protocol.constants['TICK_BYTES']
-        self._CK_LEN  = protocol.constants['CHECKSUM_LENGTH']
-
     def _open_serial(self):
-        # (re)open serial with current settings
-        self.ser = serial.Serial(self._port,
-                                 self._baud,
-                                 timeout=self._timeout)
+        self.ser = serial.Serial(self._port, self._baud, timeout=self._timeout)
 
     @property
-    def port(self) -> str:
+    def port(self):
         return self._port
 
     @port.setter
-    def port(self, new_port: str):
+    def port(self, new_port):
         self._port = new_port
         self._open_serial()
 
     @property
-    def baudrate(self) -> int:
+    def baudrate(self):
         return self._baud
 
     @baudrate.setter
-    def baudrate(self, new_baud: int):
+    def baudrate(self, new_baud):
         self._baud = new_baud
         self.ser.baudrate = new_baud
 
     @property
-    def timeout(self) -> float:
+    def timeout(self):
         return self._timeout
 
     @timeout.setter
-    def timeout(self, new_to: float):
-        self._timeout = new_to
-        self.ser.timeout = new_to
+    def timeout(self, new_timeout):
+        self._timeout = new_timeout
+        self.ser.timeout = new_timeout
 
-    def _send(self, board_id: int, addr: int, cmd: int, param: int = 0):
-        frame = bytearray(5)
-        frame[0] = self._SOF
-        frame[1] = board_id
-        frame[2] = addr
-        frame[3] = cmd
-        frame[4] = param
+    def _send(self, board_id, addr, cmd, param=0):
+        frame = bytearray([
+            self._SOF, board_id, addr, cmd, param
+        ])
         frame.append(frame[1] ^ frame[2] ^ frame[3] ^ frame[4])
         self.ser.write(frame)
 
     def _recv(self):
-        # wait for SOF
         while True:
             b = self.ser.read(1)
             if not b:
@@ -74,154 +70,124 @@ class SensorMaster:
         hdr = self.ser.read(5)
         board, addr, cmd, status, length = struct.unpack('5B', hdr)
         payload = self.ser.read(length)
-        chksum  = self.ser.read(self._CK_LEN)[0]
+        chksum = self.ser.read(self._CK_LEN)[0]
 
-        # verify XOR checksum
         chk = 0
         for byte in hdr + payload:
             chk ^= byte
         if chk != chksum:
-            raise ValueError(
-                f'Checksum mismatch: got 0x{chksum:02X}, expected 0x{chk:02X}'
-            )
+            raise ValueError(f'Checksum mismatch: expected 0x{chk:02X}, got 0x{chksum:02X}')
 
         return board, addr, cmd, status, payload
 
-    def _execute(self, board_id: int, addr: int,
-                 cmd: int, param: int = 0):
-        self._send(board_id, addr, cmd, param)
-        return self._recv()
+    def _execute(self, board_id, addr, cmd, param=0):
+        with self._lock:
+            self.ser.reset_input_buffer()
+            self._send(board_id, addr, cmd, param)
+            return self._recv()
 
-    # — high-level APIs —#
+    # High-level APIs
 
-    def read_samples(self,
-                     board_id: int,
-                     addr: int,
-                     sensor_name: str):
-        """
-        Read raw samples off the wire, then split and decode each record
-        according to the sensor’s payload_fields metadata.
-        Returns a list of dicts, each with a 'tick' key plus one entry per field.
-        """
-        cmd   = protocol.commands['CMD_READ_SAMPLES']
-        _, _, _, status, payload = self._execute(board_id, addr, cmd)
-        if status != protocol.status_codes['STATUS_OK']:
-            raise RuntimeError(f'READ failed: {status}')
+    def scan(self, start=1, end=255):
+        found = []
+        for bid in tqdm(range(start, end + 1), desc="Scanning for boards"):
+            try:
+                _, _, _, status, _ = self._execute(bid, 0x00, protocol.commands['CMD_PING'])
+                if status == STATUS_OK:
+                    found.append(bid)
+            except IOError:
+                continue
+        return found
 
-        # Grab the per-field metadata for this sensor:
-        md     = registry.metadata(sensor_name)
-        fields = md['payload_fields']
-
-        records = []
-        offset  = 0
-        rec_len = self._TICK_BYTES + sum(f['size'] for f in fields)
-
-        # Step through the payload, record by record
-        while offset + rec_len <= len(payload):
-            # first TICK_BYTES is a big-endian uint32
-            tick = struct.unpack_from('>I', payload, offset)[0]
-            offset += self._TICK_BYTES
-
-            entry = {'tick': tick}
-            # now unpack each field in order
-            for fld in fields:
-                raw = payload[offset:offset + fld['size']]
-                offset += fld['size']
-
-                # decode by type prefix
-                t = fld['type']
-                if t.startswith('uint'):
-                    val = int.from_bytes(raw, 'big', signed=False)
-                elif t.startswith('int'):
-                    val = int.from_bytes(raw, 'big', signed=True)
-                else:
-                    # fallback: hex string
-                    val = raw.hex()
-
-                entry[fld['name']] = val
-
-            records.append(entry)
-
-        return records
-
-    def add_sensor(self,
-                   board_id: int,
-                   addr: int,
-                   sensor_name: str):
-        cmd  = protocol.commands['CMD_ADD_SENSOR']
-        code = registry.type_code(sensor_name)
-        _, _, _, status, _ = self._execute(board_id, addr, cmd, code)
+    def ping(self, board_id):
+        _, _, _, status, _ = self._execute(board_id, 0x00, protocol.commands['CMD_PING'])
         return status
 
-    def remove_sensor(self,
-                      board_id: int,
-                      addr: int):
+    def list_sensors(self, board_id):
+        cmd = protocol.commands['CMD_LIST_SENSORS']
+        _, _, _, status, payload = self._execute(board_id, 0x00, cmd)
+        if status != STATUS_OK:
+            raise RuntimeError(f'LIST_SENSORS failed: {status}')
+
+        sensors = []
+        for i in range(0, len(payload), 2):
+            type_code, addr7 = payload[i], payload[i+1]
+            name = registry.name_from_type(type_code)
+            sensors.append((name, f"0x{addr7:02X}"))
+        return sensors
+
+    def add_sensor(self, board_id: int, addr: int, sensor_name: str) -> int:
+        cmd = protocol.commands['CMD_ADD_SENSOR']
+        sensor_code = registry.type_code(sensor_name)
+        _, _, _, status, _ = self._execute(board_id, addr, cmd, sensor_code)
+        return status
+
+    def remove_sensor(self, board_id: int, addr: int) -> int:
         cmd = protocol.commands['CMD_REMOVE_SENSOR']
         _, _, _, status, _ = self._execute(board_id, addr, cmd, 0)
         return status
 
-    def set_period(self,
-                   board_id: int,
-                   addr: int,
-                   ms: int):
-        if ms % 100 != 0:
-            raise ValueError('Period must be multiple of 100 ms')
-        param = ms // 100
-        cmd = protocol.commands['CMD_SET_PERIOD']
-        _, _, _, status, _ = self._execute(board_id, addr, cmd, param)
+    def read_samples(self, board_id, addr, sensor_name, mask_val=None):
+        cmd = protocol.commands['CMD_READ_SAMPLES']
+        _, _, _, status, payload = self._execute(board_id, addr, cmd)
+        if status != STATUS_OK:
+            raise RuntimeError(f'READ failed: {status}')
+
+        # Use provided mask if given, otherwise fall back to default mask
+        if mask_val is None:
+            mask_bits = registry.metadata(sensor_name).get('default_payload_bits', [])
+            mask_val = sum(1 << b for b in mask_bits)
+
+        records, offset = [], 0
+        while offset < len(payload):
+            chunk = payload[offset:]
+            entry = registry.parse_payload(sensor_name, chunk, mask_val)
+            if 'tick' not in entry:
+                break
+            records.append(entry)
+
+            # 4 bytes for timestamp + sum of enabled field sizes
+            consumed = 4
+            for idx, fld in enumerate(registry.metadata(sensor_name)['payload_fields']):
+                if mask_val & (1 << idx):
+                    consumed += fld['size']
+            offset += consumed
+
+        return records
+
+    def get_config(self, board_id, addr, field_cmd):
+        _, _, _, status, payload = self._execute(board_id, addr, field_cmd)
+        if status != STATUS_OK or not payload:
+            raise RuntimeError(f'GET_CONFIG failed for cmd=0x{field_cmd:02X}')
+        return payload[0]
+
+    def set_config(self, board_id, addr, field_cmd, value):
+        _, _, _, status, _ = self._execute(board_id, addr, field_cmd, value)
         return status
 
-    def set_gain(self,
-                 board_id: int,
-                 addr: int,
-                 gain_code: int):
-        cmd = protocol.commands['CMD_SET_GAIN']
-        _, _, _, status, _ = self._execute(board_id, addr, cmd, gain_code)
+    def get_payload_mask(self, board_id: int, addr: int) -> int:
+        cmd = protocol.commands.get('CMD_GET_PAYLOAD_MASK')
+        if cmd is None:
+            raise ValueError("CMD_GET_PAYLOAD_MASK not defined in protocol")
+        
+        _, _, _, status, payload = self._execute(board_id, addr, cmd)
+        if status != STATUS_OK or not payload:
+            raise RuntimeError(f'CMD_GET_PAYLOAD_MASK failed for board {board_id}, addr 0x{addr:02X}')
+        
+        return payload[0]
+
+    def set_payload_mask(self, board_id: int, addr: int, mask: int) -> int:
+        cmd = protocol.commands.get('CMD_SET_PAYLOAD_MASK')
+        if cmd is None:
+            raise ValueError("CMD_SET_PAYLOAD_MASK not defined in protocol")
+        
+        _, _, _, status, _ = self._execute(board_id, addr, cmd, mask)
         return status
 
-    def set_range(self,
-                  board_id: int,
-                  addr: int,
-                  range_code: int):
-        cmd = protocol.commands['CMD_SET_RANGE']
-        _, _, _, status, _ = self._execute(board_id, addr, cmd, range_code)
-        return status
+    def send_command(self, board_id, addr, cmd_name, param=0):
+        cmd = protocol.commands.get(cmd_name)
+        if cmd is None:
+            raise ValueError(f'Unknown command: {cmd_name}')
+        _, _, _, status, payload = self._execute(board_id, addr, cmd, param)
+        return status, payload
 
-    def set_cal(self,
-                board_id: int,
-                addr: int,
-                cal_code: int):
-        cmd = protocol.commands['CMD_SET_CAL']
-        _, _, _, status, _ = self._execute(board_id, addr, cmd, cal_code)
-        return status
-
-    def ping(self, board_id: int):
-        """
-        Send a simple ping (no payload) to the given board_id,
-        and return the status code.
-        """
-        cmd = protocol.commands['CMD_PING']
-        _, _, _, status, _ = self._execute(board_id, 0x00, cmd, 0)
-        return status
-
-    def list_sensors(self, board_id: int) -> list[tuple[str, str]]:
-        """
-        Returns a list of (sensor_type_name, hex_addr) strings.
-        """
-        cmd = protocol.commands['CMD_LIST_SENSORS']
-        _, _, _, status, payload = self._execute(board_id, 0x00, cmd, 0)
-
-        if status != protocol.status_codes['STATUS_OK']:
-            raise RuntimeError(f'LIST_SENSORS failed: {status}')
-
-        if len(payload) % 2 != 0:
-            raise ValueError("Invalid LIST_SENSORS payload length")
-
-        result = []
-        for i in range(0, len(payload), 2):
-            type_code = payload[i]
-            addr7     = payload[i + 1]
-            name      = registry.name_from_type(type_code)
-            result.append((name, f"0x{addr7:02X}"))
-
-        return result

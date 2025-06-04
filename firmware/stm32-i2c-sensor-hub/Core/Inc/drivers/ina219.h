@@ -1,82 +1,120 @@
-#ifndef INA219_H
-#define INA219_H
-
+/* Auto-generated from ina219.json; do not edit! */
+#pragma once
 #include "stm32l4xx_hal.h"
 #include <stdint.h>
 
-/**
- * @brief   Programmable PGA gain settings for INA219
- */
+typedef uint8_t INA219_PERIOD_t;
 typedef enum {
-    INA219_GAIN_1_40MV = 0,  /**< Gain = 1, LSB = 40 mV */
-    INA219_GAIN_2_80MV,     /**< Gain = 2, LSB = 80 mV */
-    INA219_GAIN_4_160MV,    /**< Gain = 4, LSB = 160 mV */
-    INA219_GAIN_8_320MV     /**< Gain = 8, LSB = 320 mV */
-} INA219_Gain_t;
+    INA219_GAIN_40MV = 0,
+    INA219_GAIN_80MV = 1,
+    INA219_GAIN_160MV = 2,
+    INA219_GAIN_320MV = 3,
+} INA219_GAIN_t;
+typedef uint8_t INA219_BUS_RANGE_t;
+typedef uint16_t INA219_CALIBRATION_t;
+typedef uint8_t INA219_ALL_t[4];
+#define REG_GAIN                 0x00
+#define REG_BUS_RANGE            0x00
+#define REG_CALIBRATION          0x05
+
+#define REG_BUS_VOLTAGE_MV       0x02
+#define REG_SHUNT_VOLTAGE_UV     0x01
+#define REG_CURRENT_UA           0x04
+#define REG_POWER_MW             0x03
+
+// Payload-bit definitions (each bit selects one field)
+#define BIT_BUS_VOLTAGE_MV         (1 << 0)
+#define BIT_SHUNT_VOLTAGE_UV       (1 << 1)
+#define BIT_CURRENT_UA             (1 << 2)
+#define BIT_POWER_MW               (1 << 3)
 
 /**
- * @brief   Bus voltage range selection for INA219
+ * @brief Write to register 0x00 (set gain).
  */
-typedef enum {
-    INA219_BVOLTAGERANGE_16V = 0,  /**< 0–16 V range */
-    INA219_BVOLTAGERANGE_32V      /**< 0–32 V range */
-} INA219_BusRange_t;
+HAL_StatusTypeDef INA219_SetGain(
+    I2C_HandleTypeDef *hi2c,
+    uint16_t           addr8bit,
+    INA219_GAIN_t         value
+);
 
 /**
- * @brief   Write to the CONFIG register (sets gain & bus range)
- * @param   hi2c    Pointer to initialized I2C handle
- * @param   addr8   8-bit I²C address (7-bit << 1)
- * @param   gain    One of INA219_Gain_t
- * @param   range   One of INA219_BusRange_t
- * @return  HAL_OK on success, HAL_ERROR on bus or device error
+ * @brief Read gain from register 0x00.
  */
-HAL_StatusTypeDef INA219_SetConfig(I2C_HandleTypeDef *hi2c,
-                                   uint16_t           addr8,
-                                   INA219_Gain_t      gain,
-                                   INA219_BusRange_t  range);
+HAL_StatusTypeDef INA219_ReadGain(
+    I2C_HandleTypeDef *hi2c,
+    uint16_t           addr8bit,
+    uint8_t *out
+);
 
 /**
- * @brief   Write to the CALIBRATION register
- * @param   hi2c      I2C handle
- * @param   addr8     8-bit I²C address
- * @param   calValue  Calibration value (LSB)
- * @return  HAL_OK on success
+ * @brief Write to register 0x00 (set bus_range).
  */
-HAL_StatusTypeDef INA219_SetCalibration(I2C_HandleTypeDef *hi2c,
-                                        uint16_t           addr8,
-                                        uint16_t           calValue);
+HAL_StatusTypeDef INA219_SetBusRange(
+    I2C_HandleTypeDef *hi2c,
+    uint16_t           addr8bit,
+    INA219_BUS_RANGE_t         value
+);
 
 /**
- * @brief   Read bus voltage in millivolts
- * @param   hi2c    I2C handle
- * @param   addr8   8-bit I²C address
- * @param   mV      Output pointer for voltage in mV
- * @return  HAL_OK on success
+ * @brief Read bus_range from register 0x00.
  */
-HAL_StatusTypeDef INA219_ReadBusVoltage_mV(I2C_HandleTypeDef *hi2c,
-                                           uint16_t           addr8,
-                                           uint16_t          *mV);
+HAL_StatusTypeDef INA219_ReadBusRange(
+    I2C_HandleTypeDef *hi2c,
+    uint16_t           addr8bit,
+    uint8_t *out
+);
 
 /**
- * @brief   Read shunt voltage in microvolts
- * @param   hi2c    I2C handle
- * @param   addr8   8-bit I²C address
- * @param   uV      Output pointer for voltage in µV
- * @return  HAL_OK on success
+ * @brief Write to register 0x05 (set calibration).
  */
-HAL_StatusTypeDef INA219_ReadShuntVoltage_uV(I2C_HandleTypeDef *hi2c,
-                                             uint16_t           addr8,
-                                             int32_t           *uV);
+HAL_StatusTypeDef INA219_SetCalibration(
+    I2C_HandleTypeDef *hi2c,
+    uint16_t           addr8bit,
+    INA219_CALIBRATION_t         value
+);
 
 /**
- * @brief   Read current in microamps (requires correct calibration)
- * @param   hi2c    I2C handle
- * @param   addr8   8-bit I²C address
- * @param   uA      Output pointer for current in µA
- * @return  HAL_OK on success
+ * @brief Read calibration from register 0x05.
  */
-HAL_StatusTypeDef INA219_ReadCurrent_uA(I2C_HandleTypeDef *hi2c,
-                                        uint16_t           addr8,
-                                        int32_t           *uA);
+HAL_StatusTypeDef INA219_ReadCalibration(
+    I2C_HandleTypeDef *hi2c,
+    uint16_t           addr8bit,
+    uint16_t *out
+);
 
-#endif // INA219_H
+/**
+ * @brief Set period (handled internally; no register).
+ */
+HAL_StatusTypeDef INA219_SetPeriod(
+    I2C_HandleTypeDef *hi2c,
+    uint16_t           addr8bit,
+    INA219_PERIOD_t         value
+);
+
+// Reads bus_voltage_mV from register 0x02
+HAL_StatusTypeDef INA219_ReadBusVoltageMv(
+    I2C_HandleTypeDef *hi2c,
+    uint16_t           addr8bit,
+    uint16_t           *out
+);
+
+// Reads shunt_voltage_uV from register 0x01
+HAL_StatusTypeDef INA219_ReadShuntVoltageUv(
+    I2C_HandleTypeDef *hi2c,
+    uint16_t           addr8bit,
+    int16_t           *out
+);
+
+// Reads current_uA from register 0x04
+HAL_StatusTypeDef INA219_ReadCurrentUa(
+    I2C_HandleTypeDef *hi2c,
+    uint16_t           addr8bit,
+    int16_t           *out
+);
+
+// Reads power_mW from register 0x03
+HAL_StatusTypeDef INA219_ReadPowerMw(
+    I2C_HandleTypeDef *hi2c,
+    uint16_t           addr8bit,
+    uint16_t           *out
+);

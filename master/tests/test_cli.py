@@ -2,22 +2,34 @@ import pytest
 from click.testing import CliRunner
 from sensor_master.protocol import protocol
 from sensor_master.cli.click import cli 
+import sensor_master.core as core_mod
 
-class DummyMgr:
-    def select(self, board_id):
-        return self
-    def add_sensor(self, addr, sensor):
-        return protocol.status_codes['STATUS_OK']
-    def ping(self, board_id):
-        return protocol.status_codes['STATUS_NOT_FOUND']
+class DummySerial:
+    def __init__(self, port, baud, timeout=None):
+        pass
+    def write(self, data):
+        pass
+    def read(self, n):
+        return b''
 
 @pytest.fixture(autouse=True)
-def patch_mgr(monkeypatch):
-    # Patch BoardManager in the click module to use our DummyMgr
+def patch_serial(monkeypatch):
+    # Prevent real Serial port from opening in SensorBackend.__init__
+    monkeypatch.setattr(core_mod.serial, 'Serial', DummySerial)
+    yield
+
+@pytest.fixture(autouse=True)
+def patch_backend(monkeypatch):
+    # Stub out add_sensor and ping on SensorBackend so CLI won't try real hardware
     monkeypatch.setattr(
-        "sensor_master.cli.click.BoardManager",
-        lambda port, baud: DummyMgr()
+        'sensor_master.backend.SensorBackend.add_sensor',
+        lambda self, board, addr, sensor: protocol.status_codes['STATUS_OK']
     )
+    monkeypatch.setattr(
+        'sensor_master.backend.SensorBackend.ping',
+        lambda self, board: protocol.status_codes['STATUS_NOT_FOUND']
+    )
+    yield
 
 def test_cli_add():
     runner = CliRunner()

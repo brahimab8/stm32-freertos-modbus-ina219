@@ -1,5 +1,4 @@
 #include "task/sensor_task.h"
-#include <stdlib.h>
 #include <string.h>
 
 struct SensorTaskHandle_t {
@@ -19,8 +18,6 @@ static void thread_fn(void *arg) {
 
     uint32_t next = osKernelGetTickCount();
     for (;;) {
-        next += h->period_ms;
-
         uint8_t           tmpbuf[SENSOR_MAX_PAYLOAD];
         uint8_t           tmplen = 0;
         HAL_StatusTypeDef st;
@@ -47,6 +44,7 @@ static void thread_fn(void *arg) {
         }
 
         osDelayUntil(next);
+        next += h->period_ms;
     }
 }
 
@@ -58,8 +56,8 @@ SensorTaskHandle_t *SensorTask_Create(const SensorDriver_t *driver,
 {
     if (!driver || !driver->init || !driver->read
         || !ctx || period_ms == 0 || !busMutex
-        || queue_depth == 0 || driver->sample_size == 0
-        || driver->sample_size > SENSOR_MAX_PAYLOAD)
+        || queue_depth == 0 || driver->sample_size == NULL
+        || driver->sample_size(ctx) > SENSOR_MAX_PAYLOAD)
     {
         return NULL;
     }
@@ -134,7 +132,7 @@ void SensorTask_Flush(SensorTaskHandle_t *h) {
 }
 
 uint8_t SensorTask_GetSampleSize(const SensorTaskHandle_t *h) {
-    return h ? h->drv->sample_size : 0;
+    return h ? h->drv->sample_size(h->ctx) : 0;
 }
 
 void SensorTask_UpdatePeriod(SensorTaskHandle_t *h, uint32_t period_ms)

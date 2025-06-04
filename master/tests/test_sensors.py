@@ -19,14 +19,18 @@ def test_available_matches_metadata_files():
 @pytest.mark.parametrize("sensor_file", get_sensor_files())
 def test_payload_size_and_type_code(sensor_file):
     path = os.path.join(SENSORS_DIR, sensor_file)
-    meta = json.load(open(path))
+    meta = json.load(open(path, 'r', encoding='utf-8'))
     name = meta['name'].lower()
 
     # type code matches protocol.sensors
     assert registry.type_code(name) == protocol.sensors[name]
 
-    # payload size is sum of field sizes
-    expected_size = sum(field['size'] for field in meta['payload_fields'])
+    # payload size is computed exactly as in SensorRegistry._load():
+    default_bits = meta.get('default_payload_bits', [])
+    if default_bits:
+        expected_size = sum(meta['payload_fields'][i]['size'] for i in default_bits)
+    else:
+        expected_size = sum(field['size'] for field in meta['payload_fields'])
     assert registry.payload_size(name) == expected_size
 
     # metadata returns full JSON

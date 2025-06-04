@@ -30,6 +30,7 @@
 #include "config/protocol.h"
 #include "task/sensor_manager.h"
 #include "task/cmd_task.h"
+#include "driver_registry.h"
 
 /* USER CODE END Includes */
 
@@ -210,6 +211,9 @@ int main(void)
   /* USER CODE BEGIN RTOS_MUTEX */
   busMutex = osMutexNew(NULL);
   if (busMutex == NULL) Error_Handler();
+
+  DriverRegistry_InitAll();
+
   // create the sensor manager
   mgr = SensorManager_Create(busMutex, &hi2c1);
   if (!mgr) Error_Handler();

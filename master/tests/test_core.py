@@ -45,6 +45,8 @@ def make_packet(board, addr, cmd, status, payload):
 
 def test_send_and_recv_frame_ok():
     m = core_mod.SensorMaster(port="COM1", baud=9600, timeout=0.1)
+    # When we _send(1, 2, 3, 4), we expect:
+    # [ SOF, board=1, addr=2, cmd=3, param=4, checksum=(1^2^3^4) ] written to serial.
     m._send(1, 2, 3, 4)
     expected = bytearray([
         protocol.constants['SOF_MARKER'], 1, 2, 3, 4
@@ -52,18 +54,38 @@ def test_send_and_recv_frame_ok():
     expected.append(1 ^ 2 ^ 3 ^ 4)
     assert m.ser._write_buffer == expected
 
+    # Now inject a well-formed response frame and verify _recv().
     payload = b"\x10\x20"
-    frame = make_packet(1, 2, 3, protocol.status_codes['STATUS_OK'], payload)
+    frame = make_packet(
+        board=1,
+        addr=2,
+        cmd=3,
+        status=protocol.status_codes['STATUS_OK'],
+        payload=payload
+    )
     m.ser.inject(frame)
     b, a, c, s, p = m._recv()
-    assert (b, a, c, s, p) == (1, 2, 3, protocol.status_codes['STATUS_OK'], payload)
+    assert (b, a, c, s, p) == (
+        1,
+        2,
+        3,
+        protocol.status_codes['STATUS_OK'],
+        payload
+    )
 
 
 def test_recv_checksum_mismatch():
     m = core_mod.SensorMaster(port="COM2", baud=115200, timeout=0.1)
+    # Build a valid payload, then flip the last checksum byte so that _recv() fails.
     payload = b"\x01"
-    raw = bytearray(make_packet(1, 2, 3, protocol.status_codes['STATUS_OK'], payload))
-    raw[-1] ^= 0xFF
+    raw = bytearray(make_packet(
+        board=1,
+        addr=2,
+        cmd=3,
+        status=protocol.status_codes['STATUS_OK'],
+        payload=payload
+    ))
+    raw[-1] ^= 0xFF  # Corrupt checksum
     m.ser.inject(raw)
     with pytest.raises(ValueError):
         m._recv()
@@ -82,17 +104,30 @@ def test_read_samples_parsing(monkeypatch):
         ]
     })
 
-    # stub _execute to return OK + our payload
+    # Stub registry.parse_payload(...) so that it only unpacks a record when chunk is long enough:
+    def fake_parse_payload(sensor_name, chunk, mask):
+        # We expect at least 4 bytes of tick + 2 bytes of foo = 6 total.
+        if len(chunk) < 6:
+            return {}  # “not a full record” → stop parsing
+        t = struct.unpack(">I", chunk[:4])[0]
+        f = struct.unpack(">H", chunk[4:6])[0]
+        return {'tick': t, 'foo': f}
+
+    monkeypatch.setattr(registry, "parse_payload", fake_parse_payload)
+
+    # Stub _execute(...) so that read_samples(...) sees STATUS_OK + our payload:
     monkeypatch.setattr(
         m, "_execute",
-        lambda bid, addr, cmd, param=0: (None, None, None,
-                                        protocol.status_codes['STATUS_OK'],
-                                        payload)
+        lambda bid, addr, cmd, param=0: (
+            None, None, None,
+            protocol.status_codes['STATUS_OK'],
+            payload
+        )
     )
 
     recs = m.read_samples(board_id=7, addr=0x40, sensor_name="foo")
-    # should get a list of one dict
-    assert recs == [{'tick': tick, 'foo': (0xAA << 8) | 0xBB}]
+    # Expect exactly one record: tick=5, foo=0xAABB
+    assert recs == [{'tick': tick, 'foo': 0xAABB}]
 
 
 def test_property_setters_reopen_and_update(monkeypatch):
@@ -123,15 +158,17 @@ def test_property_setters_reopen_and_update(monkeypatch):
 
 def test_ping_returns_status(monkeypatch):
     m = core_mod.SensorMaster(port="P3", baud=200, timeout=0.2)
+
     # stub _execute to simulate ping returning UNKNOWN_CMD
     monkeypatch.setattr(
         m, "_execute",
-        lambda b, a, cmd, param=0: (None, None, None,
-                                    protocol.status_codes['STATUS_UNKNOWN_CMD'],
-                                    b'')
+        lambda b, a, cmd, param=0: (
+            None, None, None,
+            protocol.status_codes['STATUS_UNKNOWN_CMD'],
+            b''
+        )
     )
 
-    # new signature is ping(board_id)
     status = m.ping(5)
     assert status == protocol.status_codes['STATUS_UNKNOWN_CMD']
 
@@ -141,7 +178,7 @@ def test_list_sensors(monkeypatch):
     # Simulate payload of interleaved type_code and addr bytes
     payload = bytes([0x01, 0x10, 0x02, 0x20, 0x03, 0x30])  # (type_code, addr) pairs
 
-    # Stub _execute to return OK with the fake payload
+    # Stub _execute(...) so that list_sensors(...) sees STATUS_OK + our payload
     monkeypatch.setattr(
         m, "_execute",
         lambda board_id, addr, cmd, param=0: (
@@ -151,7 +188,7 @@ def test_list_sensors(monkeypatch):
         )
     )
 
-    # Stub name_from_type to provide readable names for each type_code
+    # Stub registry.name_from_type(...) to map type_code → sensor_name
     monkeypatch.setattr(
         core_mod.registry, "name_from_type",
         lambda t: {
