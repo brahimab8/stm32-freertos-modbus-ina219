@@ -56,8 +56,19 @@
           "driver_side": {
             "type": "boolean",
             "description": "If true, this field lives in the sensor’s chip or hardware; false = purely software/RTOS-side."
+          },
+          "description": { 
+            "type": "string" 
+          },
+          "range":       { 
+            "type": ["string", "null"] 
+          },
+          "enum_labels": {
+            "type": "object",
+            "additionalProperties": { "type": "string" }
           }
-        },
+    },
+
         "required": ["name", "getter_cmd", "type", "size", "driver_side"],
         "if": {
           "properties": { "driver_side": { "const": true } }

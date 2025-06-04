@@ -2,12 +2,27 @@
   "name": "ina219",
 
   "config_defaults": {
-    "gain":        3,
-    "bus_range":   1,
-    "calibration": 4096
+    "period":      5,
+    "gain":        0,
+    "bus_range":   0,
+    "calibration": 0
   },
 
   "config_fields": [
+    {
+      "name": "period",
+      "getter_cmd": "CMD_GET_PERIOD",
+      "setter_cmd": "CMD_SET_PERIOD",
+      "type": "uint8",
+      "size": 1,
+      "reg_addr": null,
+      "mask": null,
+      "shift": null,
+      "endian": null,
+      "driver_side": true,
+      "description": "Polling period in 100ms units (e.g. 10 = 1s)",
+      "range": "1–255"
+    },
     {
       "name":        "gain",
       "getter_cmd":  "CMD_GET_GAIN",
@@ -18,7 +33,15 @@
       "mask":        "0x1800",
       "shift":       11,
       "endian":      "big",
-      "driver_side": true
+      "driver_side": true,
+      "description": "Programmable gain amplifier setting",
+      "range": "0-3",
+      "enum_labels": {
+        "0": "40mV",
+        "1": "80mV",
+        "2": "160mV",
+        "3": "320mV"
+      }
     },
     {
       "name":        "bus_range",
@@ -30,7 +53,9 @@
       "mask":        "0x2000",
       "shift":       13,
       "endian":      "big",
-      "driver_side": true
+      "driver_side": true,
+      "description": "Bus voltage measurement range",
+      "range": "0=16V, 1=32V"
     },
     {
       "name":        "calibration",
@@ -42,7 +67,9 @@
       "mask":        "0xFFFF",
       "shift":       0,
       "endian":      "big",
-      "driver_side": true
+      "driver_side": true,
+      "description": "Calibration register value (scales current/power)",
+      "range": "0–65535"
     },
     {
       "name":        "all",
@@ -54,7 +81,9 @@
       "mask":        null,
       "shift":       null,
       "endian":      null,
-      "driver_side": true
+      "driver_side": true,
+      "description": "Bulk fetch of all config values",
+      "range": null
     }
   ],
 
