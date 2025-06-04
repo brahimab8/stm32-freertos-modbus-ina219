@@ -7,9 +7,11 @@
 
 static HAL_StatusTypeDef ini(void *ctx) {
     INA219_Ctx_t *c = (INA219_Ctx_t *)ctx;
+    if (INA219_SetPeriod(c->hi2c, c->addr8, ina219_defaults.period) != HAL_OK) return HAL_ERROR;
     if (INA219_SetGain(c->hi2c, c->addr8, ina219_defaults.gain) != HAL_OK) return HAL_ERROR;
     if (INA219_SetBusRange(c->hi2c, c->addr8, ina219_defaults.bus_range) != HAL_OK) return HAL_ERROR;
     if (INA219_SetCalibration(c->hi2c, c->addr8, ina219_defaults.calibration) != HAL_OK) return HAL_ERROR;
+    c->period = ina219_defaults.period;
     c->gain = ina219_defaults.gain;
     c->bus_range = ina219_defaults.bus_range;
     c->calibration = ina219_defaults.calibration;
@@ -74,6 +76,10 @@ static HAL_StatusTypeDef rd(void *ctx, uint8_t out_buf[], uint8_t *out_len) {
 bool ina219_read_config(void *vctx, uint8_t field, uint8_t *out) {
     INA219_Ctx_t *c = (INA219_Ctx_t *)vctx;
     switch (field) {
+      case CMD_GET_PERIOD:
+        *out = (uint8_t)c->period;
+        return true;
+
       case CMD_GET_GAIN:
         *out = (uint8_t)c->gain;
         return true;
@@ -95,15 +101,41 @@ bool ina219_read_config(void *vctx, uint8_t field, uint8_t *out) {
     }
 }
 
+static const uint8_t ina219_config_fields[] = {
+    CMD_GET_PERIOD,
+    CMD_GET_GAIN,
+    CMD_GET_RANGE,
+    CMD_GET_CAL,
+};
+
+const uint8_t *ina219_get_config_fields(size_t *count) {
+    if (count) *count = sizeof(ina219_config_fields) / sizeof(ina219_config_fields[0]);
+    return ina219_config_fields;
+}
+
+static uint8_t get_sample_size(void *ctx) {
+    INA219_Ctx_t *c = (INA219_Ctx_t *)ctx;
+    uint8_t size = 0;
+    if (c->payload_mask & (1 << 0)) size += 2;
+    if (c->payload_mask & (1 << 1)) size += 2;
+    if (c->payload_mask & (1 << 2)) size += 2;
+    if (c->payload_mask & (1 << 3)) size += 2;
+    return size;
+}
+
 static const SensorDriver_t ina219_driver = {
     .init        = ini,
     .read        = rd,
-    .sample_size = SENSOR_PAYLOAD_SIZE_INA219,
+    .sample_size = get_sample_size,
     .read_config = ina219_read_config,
 };
 
 const SensorDriver_t *INA219_GetDriver(void) {
     return &ina219_driver;
+}
+
+static uint32_t ina219_default_period_ms(void) {
+    return 5 * 100;
 }
 
 static const SensorDriverInfo_t ina219_info = {
@@ -113,6 +145,8 @@ static const SensorDriverInfo_t ina219_info = {
     .get_driver  = INA219_GetDriver,
     .configure   = ina219_configure,
     .read_config = ina219_read_config,
+    .get_config_fields = ina219_get_config_fields,
+    .get_default_period_ms = ina219_default_period_ms,  // 5 * 100ms
 };
 
 void ina219_RegisterDriver(void) {
@@ -130,6 +164,15 @@ bool ina219_configure(void *vctx, uint8_t field_id, uint8_t param) {
     HAL_StatusTypeDef rc;
 
     switch (field_id) {
+      case CMD_SET_PERIOD:
+        rc = INA219_SetPeriod(c->hi2c, c->addr8, (INA219_PERIOD_t)param);
+        if (rc == HAL_OK) {
+            c->period = (INA219_PERIOD_t)param;
+            return true;
+        } else {
+            return false;
+        }
+
       case CMD_SET_GAIN:
         rc = INA219_SetGain(c->hi2c, c->addr8, (INA219_GAIN_t)param);
         if (rc == HAL_OK) {

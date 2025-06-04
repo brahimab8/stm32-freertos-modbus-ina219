@@ -2,7 +2,8 @@
 #include "config/ina219_config.h"
 
 INA219_config_defaults_t ina219_defaults = {
-    .gain = 3,
-    .bus_range = 1,
-    .calibration = 4096,
+    .period = 5,
+    .gain = INA219_GAIN_40MV,
+    .bus_range = 0,
+    .calibration = 0,
 };

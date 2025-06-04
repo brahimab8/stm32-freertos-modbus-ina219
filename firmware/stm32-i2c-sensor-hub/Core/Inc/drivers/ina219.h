@@ -3,11 +3,16 @@
 #include "stm32l4xx_hal.h"
 #include <stdint.h>
 
-typedef uint8_t INA219_GAIN_t;
+typedef uint8_t INA219_PERIOD_t;
+typedef enum {
+    INA219_GAIN_40MV = 0,
+    INA219_GAIN_80MV = 1,
+    INA219_GAIN_160MV = 2,
+    INA219_GAIN_320MV = 3,
+} INA219_GAIN_t;
 typedef uint8_t INA219_BUS_RANGE_t;
 typedef uint16_t INA219_CALIBRATION_t;
 typedef uint8_t INA219_ALL_t[4];
-
 #define REG_GAIN                 0x00
 #define REG_BUS_RANGE            0x00
 #define REG_CALIBRATION          0x05
@@ -75,6 +80,15 @@ HAL_StatusTypeDef INA219_ReadCalibration(
     I2C_HandleTypeDef *hi2c,
     uint16_t           addr8bit,
     uint16_t *out
+);
+
+/**
+ * @brief Set period (handled internally; no register).
+ */
+HAL_StatusTypeDef INA219_SetPeriod(
+    I2C_HandleTypeDef *hi2c,
+    uint16_t           addr8bit,
+    INA219_PERIOD_t         value
 );
 
 // Reads bus_voltage_mV from register 0x02

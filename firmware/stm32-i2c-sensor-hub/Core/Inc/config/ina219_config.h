@@ -4,6 +4,7 @@
 #include "drivers/ina219.h"
 
 typedef struct {
+    INA219_PERIOD_t period;
     INA219_GAIN_t gain;
     INA219_BUS_RANGE_t bus_range;
     INA219_CALIBRATION_t calibration;

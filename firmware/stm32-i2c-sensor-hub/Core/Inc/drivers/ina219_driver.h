@@ -25,6 +25,7 @@ void ina219_RegisterDriver(void);
 typedef struct {
     I2C_HandleTypeDef *hi2c;      /**< I2C handle */
     uint16_t           addr8;     /**< 8-bit I²C address */
+    INA219_PERIOD_t period;
     INA219_GAIN_t gain;
     INA219_BUS_RANGE_t bus_range;
     INA219_CALIBRATION_t calibration;
