@@ -260,3 +260,13 @@ SM_Entry_t *SensorManager_GetByIndex(SensorManager_t *mgr, uint8_t index) {
     if (!mgr || index >= mgr->count) return NULL;
     return &mgr->entries[index];
 }
+
+const SensorDriverInfo_t *SensorRegistry_FindByAddr(SensorManager_t *mgr, uint8_t addr7) {
+    if (!mgr) return NULL;
+    for (uint8_t i = 0; i < mgr->count; ++i) {
+        if (mgr->entries[i].addr7 == addr7) {
+            return SensorRegistry_Find(mgr->entries[i].type_code);
+        }
+    }
+    return NULL;
+}

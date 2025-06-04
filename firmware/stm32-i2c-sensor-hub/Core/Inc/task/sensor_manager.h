@@ -164,4 +164,21 @@ uint8_t SensorManager_GetCount(SensorManager_t *mgr);
  */
 SM_Entry_t *SensorManager_GetByIndex(SensorManager_t *mgr, uint8_t index);
 
+
+/**
+ * @brief Look up the sensor driver information for a given I²C address.
+ *
+ * This function searches the SensorManager's list of active sensors to find
+ * the one matching the specified 7-bit I²C address. If found, it returns
+ * a pointer to the corresponding SensorDriverInfo_t structure, which contains
+ * metadata and function pointers for that sensor's driver.
+ *
+ * @param[in] mgr     Pointer to the SensorManager instance.
+ * @param[in] addr7   7-bit I²C address of the sensor.
+ *
+ * @return Pointer to the sensor's SensorDriverInfo_t structure,
+ *         or NULL if not found.
+ */
+const SensorDriverInfo_t *SensorRegistry_FindByAddr(SensorManager_t *mgr, uint8_t addr7);
+
 #endif // SENSOR_MANAGER_H
