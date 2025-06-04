@@ -17,6 +17,9 @@ typedef struct {
     const SensorDriver_t *(*get_driver)(void);
     bool (*configure)(void *ctx, uint8_t field_id, uint8_t value);
     bool (*read_config)(void *ctx, uint8_t field_id, uint8_t *value);
+    const uint8_t *(*get_config_fields)(size_t *count); 
+    uint32_t (*get_default_period_ms)(void);
+
 } SensorDriverInfo_t;
 
 void SensorRegistry_Register(const SensorDriverInfo_t *info);

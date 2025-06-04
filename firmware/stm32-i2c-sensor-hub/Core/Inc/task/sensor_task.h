@@ -36,8 +36,8 @@ typedef struct {
                               uint8_t out_buf[SENSOR_MAX_PAYLOAD],
                               uint8_t *out_len);
 
-    /** Number of payload bytes produced by this driver on each read. */
-    uint8_t sample_size;
+    /**function pointer: Number of payload bytes produced by this driver on each read. */
+    uint8_t           (*sample_size)(void *ctx);
 
     /**
      * @brief   Get the sensor config values.
