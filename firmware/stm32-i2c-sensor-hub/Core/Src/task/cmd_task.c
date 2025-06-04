@@ -99,11 +99,13 @@ void CommandTask(void *argument) {
             }
 
             case CMD_ADD_SENSOR: {
+                const SensorDriverInfo_t *info = SensorRegistry_Find(cmd.param);
+                uint32_t period = (info && info->get_default_period_ms)
+                                ? info->get_default_period_ms()
+                                : 500;  // fallback
+
                 uint8_t status = SensorManager_AddByType(
-                    mgr,
-                    cmd.param,             // sensor type from UART frame
-                    cmd.addr7,             // I²C address
-                    SENSOR_DEFAULT_POLL_PERIOD
+                    mgr, cmd.param, cmd.addr7, period
                 );
                 send_status_response(&cmd, status);
                 break;
@@ -152,42 +154,28 @@ void CommandTask(void *argument) {
                 break;
             }
 
-            case CMD_SET_PERIOD: {
-                uint8_t status = SensorManager_SetPeriod(mgr, cmd.addr7, cmd.param * 100);
-                send_status_response(&cmd, status);
-                break;
-            }
-
-            case CMD_SET_GAIN:
-            case CMD_SET_RANGE:
-            case CMD_SET_CAL: {
-                uint8_t status = SensorManager_Configure(mgr, cmd.addr7, cmd.cmd, cmd.param);
-                send_status_response(&cmd, status);
-                break;
-            }
-
-            case CMD_GET_PERIOD: {
-                uint8_t period_units;
-                SM_Status_t st = SensorManager_GetConfig(
-                    mgr, cmd.addr7, CMD_GET_PERIOD, &period_units
+            case CMD_CONFIG_SETTERS_START ... CMD_CONFIG_SETTERS_END: {
+                // Generic configure call for whatever setter this is
+                uint8_t status = SensorManager_Configure(
+                    mgr, cmd.addr7, cmd.cmd, cmd.param
                 );
-                if (st == SM_OK) {
-                    size_t len = ResponseBuilder_BuildFieldResponse(
-                        txbuf,
-                        cmd.addr7,
-                        CMD_GET_PERIOD,
-                        period_units
+
+                // If it succeeded and it was SET_PERIOD, update the RTOS task interval
+                if (status == SM_OK && cmd.cmd == CMD_SET_PERIOD) {
+                    uint32_t new_ms = (uint32_t)cmd.param * 100;  // param=5 → 500ms
+                    SM_Status_t st2 = SensorManager_SetPeriod(
+                        mgr, cmd.addr7, new_ms
                     );
-                    HAL_UART_Transmit(&huart1, txbuf, len, HAL_MAX_DELAY);
-                } else {
-                    send_status_response(&cmd, STATUS_ERROR);
+                    if (st2 != SM_OK) {
+                        status = SM_ERROR;
+                    }
                 }
+
+                send_status_response(&cmd, status == SM_OK ? STATUS_OK : STATUS_ERROR);
                 break;
             }
 
-            case CMD_GET_GAIN:
-            case CMD_GET_RANGE:
-            case CMD_GET_CAL: {
+            case CMD_CONFIG_GETTERS_START ... CMD_CONFIG_GETTERS_END: {
                 uint8_t val;
                 SM_Status_t st = SensorManager_GetConfig(
                     mgr, cmd.addr7, cmd.cmd, &val
@@ -207,28 +195,33 @@ void CommandTask(void *argument) {
             }
 
             case CMD_GET_CONFIG: {
-                uint8_t payload[4];
-                SM_Status_t st;
+                const SensorDriverInfo_t *info = SensorRegistry_FindByAddr(mgr, cmd.addr7);
+                if (!info || !info->get_config_fields) {
+                    send_status_response(&cmd, STATUS_ERROR);
+                    break;
+                }
 
-                st = SensorManager_GetConfig(mgr, cmd.addr7, CMD_GET_PERIOD, &payload[0]);
-                if (st != SM_OK) { send_status_response(&cmd, STATUS_ERROR); break; }
+                size_t count = 0;
+                const uint8_t *fields = info->get_config_fields(&count);
+                if (!fields || count == 0 || count > 16) {
+                    send_status_response(&cmd, STATUS_ERROR);
+                    break;
+                }
 
-                st = SensorManager_GetConfig(mgr, cmd.addr7, CMD_GET_GAIN, &payload[1]);
-                if (st != SM_OK) { send_status_response(&cmd, STATUS_ERROR); break; }
+                uint8_t values[16];
+                for (size_t i = 0; i < count; ++i) {
+                    SM_Status_t st = SensorManager_GetConfig(mgr, cmd.addr7, fields[i], &values[i]);
+                    if (st != SM_OK) {
+                        send_status_response(&cmd, STATUS_ERROR);
+                        return; // Abort immediately on error
+                    }
+                }
 
-                st = SensorManager_GetConfig(mgr, cmd.addr7, CMD_GET_RANGE, &payload[2]);
-                if (st != SM_OK) { send_status_response(&cmd, STATUS_ERROR); break; }
-
-                st = SensorManager_GetConfig(mgr, cmd.addr7, CMD_GET_CAL, &payload[3]);
-                if (st != SM_OK) { send_status_response(&cmd, STATUS_ERROR); break; }
-
-                size_t len = ResponseBuilder_BuildGetConfig(
+                size_t len = ResponseBuilder_BuildConfigValues(
                     txbuf,
                     cmd.addr7,
-                    payload[0],  // period_u100
-                    payload[1],  // gain
-                    payload[2],  // range
-                    payload[3]   // calib_lsb
+                    values,
+                    count
                 );
                 HAL_UART_Transmit(&huart1, txbuf, len, HAL_MAX_DELAY);
                 break;
