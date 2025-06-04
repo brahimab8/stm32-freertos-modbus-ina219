@@ -10,6 +10,7 @@ setup(
         "flask>=2.0",
         "click>=8.0",
         "PyQt5>=5.15",
+        "tqdm>=4.0",
     ],
     extras_require={
         "dev": [
