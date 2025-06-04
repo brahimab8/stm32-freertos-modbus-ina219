@@ -17,20 +17,27 @@
     "CMD_READ_SAMPLES":     0,
     "CMD_ADD_SENSOR":       1,
     "CMD_REMOVE_SENSOR":    2,
-    "CMD_SET_PERIOD":       3,
-    "CMD_SET_MASK":         4,
-    "CMD_SET_GAIN":         5,
-    "CMD_SET_RANGE":        6,
-    "CMD_SET_CAL":          7,
-    "CMD_PING":             8,
-    "CMD_LIST_SENSORS":     9,
-    "CMD_GET_PERIOD":       10,
-    "CMD_GET_GAIN":         11,
-    "CMD_GET_RANGE":        12,
-    "CMD_GET_CAL":          13,
-    "CMD_GET_CONFIG":       14,
-    "CMD_SET_PAYLOAD_MASK": 15,
-    "CMD_GET_PAYLOAD_MASK": 16
+    "CMD_PING":             3,
+    "CMD_LIST_SENSORS":     4,
+    "CMD_SET_PAYLOAD_MASK": 5,
+    "CMD_GET_PAYLOAD_MASK": 6,
+    "CMD_GET_CONFIG":       7,
+
+    "CMD_SET_PERIOD":       20,
+    "CMD_SET_GAIN":         21,
+    "CMD_SET_RANGE":        22,
+    "CMD_SET_CAL":          23,
+
+    "CMD_GET_PERIOD":       30,
+    "CMD_GET_GAIN":         31,
+    "CMD_GET_RANGE":        32,
+    "CMD_GET_CAL":          33
+
+  },
+
+  "command_ranges": {
+    "config_setters": [20, 29],
+    "config_getters": [30, 39]
   },
 
   "sensors": {

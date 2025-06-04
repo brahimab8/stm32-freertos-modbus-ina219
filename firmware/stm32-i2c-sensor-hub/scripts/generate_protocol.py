@@ -45,6 +45,17 @@ def gen_protocol(proto: dict, out_dir: str):
         lines.append(f"#define {k:<20} {v}")
     lines.append("")
 
+    # 3.1) Command ranges
+    ranges = proto.get("command_ranges", {})
+    if ranges:
+        lines.append("// Command ID ranges")
+        for name, bounds in ranges.items():
+            start_macro = f"CMD_{name.upper()}_START"
+            end_macro   = f"CMD_{name.upper()}_END"
+            lines.append(f"#define {start_macro:<30} {bounds[0]}")
+            lines.append(f"#define {end_macro:<30} {bounds[1]}")
+        lines.append("")
+
     # 4) Sensor-type codes (if any)
     sensors = proto.get("sensors", {})
     if sensors:
