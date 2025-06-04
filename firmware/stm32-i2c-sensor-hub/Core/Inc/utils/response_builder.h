@@ -143,4 +143,27 @@ size_t ResponseBuilder_BuildSamples(
     uint8_t  sample_size
 );
 
+/**
+ * @brief Build a compact CMD_GET_CONFIG response containing config values.
+ *
+ * Format:
+ *   [SOF][board_id][addr7][CMD_GET_CONFIG][STATUS_OK][length=N]
+ *   [ values[0] ... values[N-1] ]
+ *   [ checksum ]
+ *
+ * This assumes host and device agree on field order and count.
+ *
+ * @param outbuf  Output buffer (must be at least 6 + count + 1 bytes)
+ * @param addr7   Sensor address (7-bit)
+ * @param values  Array of config values
+ * @param count   Number of config values
+ * @return        Total bytes written to outbuf, or 0 on error
+ */
+size_t ResponseBuilder_BuildConfigValues(
+    uint8_t *outbuf,
+    uint8_t addr7,
+    const uint8_t *values,
+    size_t count
+);
+
 #endif // RESPONSE_BUILDER_H

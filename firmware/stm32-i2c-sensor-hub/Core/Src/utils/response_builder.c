@@ -256,3 +256,37 @@ size_t ResponseBuilder_BuildSamples(
 
     return checksum_index + 1;
 }
+
+/*--------------------------------------------------------------------
+ * 6) Compact config-values response:
+ *      [SOF][board_id][addr7][CMD_GET_CONFIG][STATUS_OK][length=N]
+ *        [ value_0 ][ value_1 ] ... [ value_N-1 ]
+ *      [ checksum ]
+ *-------------------------------------------------------------------*/
+size_t ResponseBuilder_BuildConfigValues(
+    uint8_t *outbuf,
+    uint8_t addr7,
+    const uint8_t *values,
+    size_t count
+) {
+    if (!outbuf || !values || count == 0 || count > 32) {
+        return 0;
+    }
+
+    uint8_t payload_len = (uint8_t)count;
+
+    // Build header
+    size_t payload_off = Build_Header(outbuf, addr7, CMD_GET_CONFIG, STATUS_OK, payload_len);
+    if (payload_off == 0) {
+        return 0;
+    }
+
+    // Copy config values directly
+    memcpy(&outbuf[payload_off], values, count);
+
+    // Checksum after last value
+    size_t checksum_index = payload_off + count;
+    Build_Checksum(outbuf, 1, checksum_index);
+
+    return checksum_index + 1;
+}
