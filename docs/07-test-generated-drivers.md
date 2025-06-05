@@ -1,5 +1,7 @@
 # 07 Test Generated Drivers
 
+*Corresponds to [version 1.4.1 of the repository](https://github.com/brahimab8/stm32-i2c-sensor-hub/tree/v1.4.1).*
+
 ## Objective
 Make all generated sensor and configuration code testable in a plain C build (PC/CI) without STM32 HAL or FreeRTOS.
 
@@ -50,7 +52,3 @@ Overall coverage rate:
   lines......: 65.6% (296 of 451 lines)
   functions..: 69.2% (27 of 39 functions)
 ```
-
-
-## Note:
-*The INA219 driver and related files were updated manually to support HAL-IF and the generic test harness. The Python generator (generate_sensor_driver.py) is not yet updated to emit those changes automatically—further work is required to bring the generator in sync.*
