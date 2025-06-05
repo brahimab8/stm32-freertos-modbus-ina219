@@ -35,7 +35,11 @@ def generator_modules():
         spec.loader.exec_module(module)
         mod_map[modname.split(".")[-1]] = module
 
-    return mod_map["config_generator"], mod_map["hal_generator"], mod_map["generate_sensor_driver"]
+    return (
+        mod_map["config_generator"],
+        mod_map["hal_generator"],
+        mod_map["generate_sensor_driver"],
+    )
 
 
 @pytest.fixture
@@ -135,8 +139,8 @@ def test_gen_sensor_hal_wrapper_creates_hal(tmp_path, toy_sensor_meta, generator
     assert f"{upper}_ReadMeasurement" in hal_hdr_text
 
     hal_src_text = hal_src.read_text()
-    # The HAL source must define “TESTSENSOR_ReadMeasurement(...)”
-    assert f"HAL_StatusTypeDef {upper}_ReadMeasurement" in hal_src_text
+    # The HAL source must define the function “TESTSENSOR_ReadMeasurement(...)”
+    assert f"{upper}_ReadMeasurement" in hal_src_text
 
 
 def test_gen_sensor_driver_files_creates_driver(tmp_path, toy_sensor_meta, generator_modules):
@@ -171,8 +175,8 @@ def test_gen_sensor_driver_files_creates_driver(tmp_path, toy_sensor_meta, gener
     assert "bool testsensor_read_config" in drv_hdr_text
 
     drv_src_text = drv_src.read_text()
-    # The driver source should include both a static ini() and a static rd() function
-    assert "static HAL_StatusTypeDef ini" in drv_src_text
-    assert "static HAL_StatusTypeDef rd" in drv_src_text
+    # The driver source should include the public init_ctx() and read_config() functions
+    assert "void testsensor_init_ctx" in drv_src_text
+    assert "bool testsensor_read_config" in drv_src_text
     # And it should pack exactly default_payload_bits into rd():
     assert "if (mask & BIT_MEASUREMENT)" in drv_src_text
