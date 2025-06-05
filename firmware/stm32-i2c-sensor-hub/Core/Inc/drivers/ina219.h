@@ -1,6 +1,7 @@
-/* Auto-generated from ina219.json; do not edit! */
+/* Manually edited ina219.h; */
 #pragma once
-#include "stm32l4xx_hal.h"
+
+#include <hal_if.h>
 #include <stdint.h>
 
 typedef uint8_t INA219_PERIOD_t;
@@ -13,6 +14,7 @@ typedef enum {
 typedef uint8_t INA219_BUS_RANGE_t;
 typedef uint16_t INA219_CALIBRATION_t;
 typedef uint8_t INA219_ALL_t[4];
+
 #define REG_GAIN                 0x00
 #define REG_BUS_RANGE            0x00
 #define REG_CALIBRATION          0x05
@@ -31,90 +33,98 @@ typedef uint8_t INA219_ALL_t[4];
 /**
  * @brief Write to register 0x00 (set gain).
  */
-HAL_StatusTypeDef INA219_SetGain(
-    I2C_HandleTypeDef *hi2c,
-    uint16_t           addr8bit,
-    INA219_GAIN_t         value
+halif_status_t INA219_SetGain(
+    halif_handle_t h_i2c,
+    uint8_t        addr7bit,
+    INA219_GAIN_t  value
 );
 
 /**
  * @brief Read gain from register 0x00.
  */
-HAL_StatusTypeDef INA219_ReadGain(
-    I2C_HandleTypeDef *hi2c,
-    uint16_t           addr8bit,
-    uint8_t *out
+halif_status_t INA219_ReadGain(
+    halif_handle_t h_i2c,
+    uint8_t        addr7bit,
+    uint8_t       *out
 );
 
 /**
  * @brief Write to register 0x00 (set bus_range).
  */
-HAL_StatusTypeDef INA219_SetBusRange(
-    I2C_HandleTypeDef *hi2c,
-    uint16_t           addr8bit,
-    INA219_BUS_RANGE_t         value
+halif_status_t INA219_SetBusRange(
+    halif_handle_t   h_i2c,
+    uint8_t          addr7bit,
+    INA219_BUS_RANGE_t value
 );
 
 /**
  * @brief Read bus_range from register 0x00.
  */
-HAL_StatusTypeDef INA219_ReadBusRange(
-    I2C_HandleTypeDef *hi2c,
-    uint16_t           addr8bit,
-    uint8_t *out
+halif_status_t INA219_ReadBusRange(
+    halif_handle_t   h_i2c,
+    uint8_t          addr7bit,
+    uint8_t         *out
 );
 
 /**
  * @brief Write to register 0x05 (set calibration).
  */
-HAL_StatusTypeDef INA219_SetCalibration(
-    I2C_HandleTypeDef *hi2c,
-    uint16_t           addr8bit,
-    INA219_CALIBRATION_t         value
+halif_status_t INA219_SetCalibration(
+    halif_handle_t      h_i2c,
+    uint8_t             addr7bit,
+    INA219_CALIBRATION_t value
 );
 
 /**
  * @brief Read calibration from register 0x05.
  */
-HAL_StatusTypeDef INA219_ReadCalibration(
-    I2C_HandleTypeDef *hi2c,
-    uint16_t           addr8bit,
-    uint16_t *out
+halif_status_t INA219_ReadCalibration(
+    halif_handle_t      h_i2c,
+    uint8_t             addr7bit,
+    uint16_t           *out
 );
 
 /**
  * @brief Set period (handled internally; no register).
  */
-HAL_StatusTypeDef INA219_SetPeriod(
-    I2C_HandleTypeDef *hi2c,
-    uint16_t           addr8bit,
-    INA219_PERIOD_t         value
+halif_status_t INA219_SetPeriod(
+    halif_handle_t h_i2c,
+    uint8_t        addr7bit,
+    INA219_PERIOD_t value
 );
 
-// Reads bus_voltage_mV from register 0x02
-HAL_StatusTypeDef INA219_ReadBusVoltageMv(
-    I2C_HandleTypeDef *hi2c,
-    uint16_t           addr8bit,
-    uint16_t           *out
+/**
+ * @brief Reads bus_voltage_mV from register 0x02.
+ */
+halif_status_t INA219_ReadBusVoltageMv(
+    halif_handle_t h_i2c,
+    uint8_t        addr7bit,
+    uint16_t      *out
 );
 
-// Reads shunt_voltage_uV from register 0x01
-HAL_StatusTypeDef INA219_ReadShuntVoltageUv(
-    I2C_HandleTypeDef *hi2c,
-    uint16_t           addr8bit,
-    int16_t           *out
+/**
+ * @brief Reads shunt_voltage_uV from register 0x01.
+ */
+halif_status_t INA219_ReadShuntVoltageUv(
+    halif_handle_t h_i2c,
+    uint8_t        addr7bit,
+    int16_t       *out
 );
 
-// Reads current_uA from register 0x04
-HAL_StatusTypeDef INA219_ReadCurrentUa(
-    I2C_HandleTypeDef *hi2c,
-    uint16_t           addr8bit,
-    int16_t           *out
+/**
+ * @brief Reads current_uA from register 0x04.
+ */
+halif_status_t INA219_ReadCurrentUa(
+    halif_handle_t h_i2c,
+    uint8_t        addr7bit,
+    int16_t       *out
 );
 
-// Reads power_mW from register 0x03
-HAL_StatusTypeDef INA219_ReadPowerMw(
-    I2C_HandleTypeDef *hi2c,
-    uint16_t           addr8bit,
-    uint16_t           *out
+/**
+ * @brief Reads power_mW from register 0x03.
+ */
+halif_status_t INA219_ReadPowerMw(
+    halif_handle_t h_i2c,
+    uint8_t        addr7bit,
+    uint16_t      *out
 );
