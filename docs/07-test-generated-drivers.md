@@ -6,30 +6,51 @@ Make all generated sensor and configuration code testable in a plain C build (PC
 ## Steps
 
 1. **Add HAL-IF layer**  
-   - Create `hal_if.h` (I²C init/read/write signatures).  
-   - Provide `hal_if.c` (real HAL) and `hal_if_stub.c` (returns `HALIF_OK`).  
-   - TODO: Implement these files.
+   - Created `hal_if.h` (I²C init/read/write signatures).  
+   * Provided a real `hal_if.c` for STM32 and a stub (`hal_if_stub.c`) that returns success and zero-fills reads.
 
-2. **Update generator to emit HAL-IF calls**  
-   - Modify `generate_sensor_driver.py` (and any scripts that produce sensor HAL wrappers) so that each generated driver:  
-     - Includes `hal_if.h` instead of unguarded `stm32l4xx_hal.h`.  
-     - Replaces any `HAL_I2C_Master_Transmit/Receive` calls with `halif_i2c_write/read()`.  
-     - Defines context structs holding `halif_handle_t` instead of `I2C_HandleTypeDef*`.  
-   - TODO: Regenerate one driver (e.g., INA219) and verify it compiles under `-DTEST`.
+2. **Update generator to emit HAL-IF calls**
 
-3. **Exclude RTOS/task code from tests**  
-   - Ensure `Core/Src/task/` and `sensor_manager.c` are omitted in the test Makefile or build target.  
-   - TODO: Adjust Makefile to only include driver and utility files.
+   * Modified `generate_sensor_driver.py`.
+   * Included `hal_if.h` instead of unguarded `stm32l4xx_hal.h`.
+   * Swapped all `HAL_I2C_Master_…` calls for `halif_i2c_write/read()`.
+   * Context structs now hold `halif_handle_t` instead of `I2C_HandleTypeDef*`.
 
-4. **Build minimal test harness**  
-   - Create `Core/tests/test_main.c` that exercises:  
-     - `sample_size()` for various masks.  
-     - `read_config()` dispatch logic.  
-     - One utility (e.g. `compute_checksum()`).  
-   - Add `Core/tests/Makefile` which compiles (with `-DTEST`):  
-     - All generated driver sources (`Core/Src/drivers/*.c`).  
-     - Utility sources (`Core/Src/utils/*.c`).  
-     - `hal_if_stub.c` and `test_main.c`.  
-     - Links into a `test_runner` executable.  
-   - TODO: Populate tests and confirm `test_runner` passes.
+3. **Exclude RTOS/task code from tests**
 
+   * Test Makefile omits any FreeRTOS/CMSIS or `Core/Src/task/` files.
+   * Only utility and driver sources are compiled under `-DTEST`.
+
+4. **Build minimal test harness**
+
+   * Wrote two test runners:
+
+     1. **Response+Checksum tests** (`test_response.c` → `test_response_runner`) exercise `checksum.c` and `response_builder.c`.
+     2. **Generated-driver tests** (`test_generated_drivers.c` → `test_drivers_runner`) exercise the INA219 code (initialization, sample-size/read/configure logic) via the registry and `hal_if_stub.c`.
+   * Created a single Makefile that compiles each set under coverage flags (`-fprofile-arcs -ftest-coverage`) into two binaries: `test_response_runner` and `test_drivers_runner`.
+
+5. **Generate coverage report**
+
+   * Added a `coverage-html` target that zeroes counters, runs both test binaries, captures coverage data with `lcov`, and generates an HTML report via `genhtml`.
+
+## Usage
+
+On Linux (or using WSL), navigate to the `tests/` folder, then use `make` to build and run the tests:
+
+```sh
+make all
+./test_response_runner
+./test_drivers_runner
+make coverage-html
+```
+Example output (open generated HTML-file for more detailed coverage stats):
+
+```
+Overall coverage rate:
+  lines......: 65.6% (296 of 451 lines)
+  functions..: 69.2% (27 of 39 functions)
+```
+
+
+## Note:
+*The INA219 driver and related files were updated manually to support HAL-IF and the generic test harness. The Python generator (generate_sensor_driver.py) is not yet updated to emit those changes automatically—further work is required to bring the generator in sync.*
