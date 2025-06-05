@@ -19,5 +19,7 @@ Welcome! This site walks you through the firmware and Python CLI for our RS-485 
 - [03 – Sensor Tasks Manager](03-sensor-manager.md)  
 - [04 – Command & Response Handling](04-command-handling.md)  
 - [05 – Master Tools (CLI)](05-master-tools.md)  
+- [06 - Sensor-Config Generator](06-sensor-config-generator.md)  
+- [07 -Test Generated Drivers](07-test-generated-drivers.md)  
 
 ---

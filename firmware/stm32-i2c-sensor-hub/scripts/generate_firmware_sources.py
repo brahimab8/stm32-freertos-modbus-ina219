@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 """
-build_headers.py
-
 Top‐level “umbrella” script.  Steps:
 
   1) Validate each sensor JSON against the JSON schema.

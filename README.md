@@ -59,6 +59,8 @@ sensor-cli --help
 3. [Sensor Tasks Manager](docs/03-sensor-manager.md)  
 4. [Command & Response Handling](docs/04-command-handling.md)  
 5. [Master Tools (CLI)](docs/05-master-tools.md)  
+6. [Sensor-Config Generator](docs/06-sensor-config-generator.md)  
+7. [Test Generated Drivers](docs/07-test-generated-drivers.md)  
 
 ---
 
@@ -66,8 +68,6 @@ sensor-cli --help
 
 - **Qt GUI frontend** for a desktop monitoring/control app  
 - **Support additional sensor types** (SPI, analog, digital) beyond I²C  
-- **Generated driver logic**: user-filled JSON → sensor driver/manager code  
-- **Scheduled commands**: master-side scheduler thread + queue for timed or recurring reads/operations over RS-485  
 - **Persistent storage**: log data on master (e.g. SQLite)  
 
 ---
