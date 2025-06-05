@@ -67,7 +67,14 @@ def shell(monkeypatch):
 def test_scan_command(shell, capsys):
     shell.onecmd('scan')
     out = capsys.readouterr().out
-    assert 'Boards found: 1, 2, 3' in out
+
+    expected = (
+        "Board 1: <no sensors>\n"
+        "Board 2: <no sensors>\n"
+        "Board 3: <no sensors>\n"
+    )
+    assert out == expected
+
     assert ('scan',) in shell.backend.board_mgr.calls
 
 def test_add_command(shell, capsys):
