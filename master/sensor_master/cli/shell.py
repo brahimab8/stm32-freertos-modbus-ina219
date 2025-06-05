@@ -87,11 +87,30 @@ class SensorShell(cmd.Cmd):
     def do_scan(self, arg):
         """Scan for all boards (discovery mode)."""
         try:
+            # Run discovery mode and get back a dict: { board_id: [ {name, addr, config}, … ], … }
             info = self.backend.set_mode(Mode.DISCOVERY)
-            boards = list(info.keys())
-            print("Boards found:", ", ".join(str(b) for b in boards) or "None")
+
+            if not isinstance(info, dict):
+                print("Boards found: None")
+                return
+
+            boards = sorted(info.keys())
+            if not boards:
+                print("Boards found: None")
+                return
+
+            # Print each board and its sensor‐list
+            for bid in boards:
+                sensors = info[bid]            # this is a list of { 'name':…, 'addr':…, 'config':… }
+                if sensors:
+                    print(f"Board {bid}:")
+                    for s in sensors:
+                        print(f"  • {s['name']} @ 0x{s['addr']:02X}")
+                else:
+                    print(f"Board {bid}: <no sensors>")
+
         except Exception as e:
-            print("Error scanning:", e)
+            print("Error scanning for boards:", e)
 
     def do_list(self, arg):
         """List sensors on the current board."""

@@ -38,11 +38,18 @@ class SensorBackend:
         discovery_info = {}
         for bid in self.board_mgr.scan():
             bound = self.board_mgr.select(bid)
+
+            try:
+                raw_sensors = bound.list_sensors()
+            except RuntimeError as e:
+                raw_sensors = []
+
             sensor_list = []
-            for name, hex_addr in bound.list_sensors():
+            for name, hex_addr in raw_sensors:
                 addr = int(hex_addr, 16)
                 cfg = self._get_sensor_config(bound, bid, addr, name)
                 sensor_list.append({'name': name, 'addr': addr, 'config': cfg})
+
             discovery_info[bid] = sensor_list
         return discovery_info
 

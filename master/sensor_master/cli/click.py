@@ -3,7 +3,7 @@ import click
 
 from sensor_master.protocol import protocol
 from sensor_master.sensors import registry
-from sensor_master.backend import SensorBackend
+from sensor_master.backend import SensorBackend, Mode
 
 STATUS_NAMES = {v: k for k, v in protocol.status_codes.items()}
 
@@ -49,8 +49,21 @@ def ping(ctx, board):
 def scan(ctx):
     """Scan for all boards (discovery)."""
     backend = ctx.obj
-    boards = list(backend.set_mode("discovery").keys())
-    click.echo("Boards found: " + (", ".join(str(b) for b in boards) or "None"))
+    try:
+        info = backend.set_mode(Mode.DISCOVERY)
+
+        if not isinstance(info, dict):
+            click.echo("Boards found: None")
+            return
+
+        boards = list(info.keys())
+        if not boards:
+            click.echo("Boards found: None")
+        else:
+            click.echo("Boards found: " + ", ".join(str(b) for b in boards))
+
+    except Exception as e:
+        click.echo(f"Error scanning for boards: {e}")
 
 
 @cli.command(name='list')
