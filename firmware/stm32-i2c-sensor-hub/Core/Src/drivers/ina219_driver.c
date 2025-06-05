@@ -1,4 +1,4 @@
-/* Manually edited ina219_driver.c */
+/* Auto-generated ina219_driver.c; do not edit! */
 #include "drivers/ina219_driver.h"
 #include "config/ina219_config.h"
 #include "config/protocol.h"
@@ -7,26 +7,13 @@
 
 static halif_status_t ini(void *ctx) {
     INA219_Ctx_t *c = (INA219_Ctx_t *)ctx;
-    // Set default period
-    if (INA219_SetPeriod(c->h_i2c, c->addr7, ina219_defaults.period) != HALIF_OK) {
-        return HALIF_ERROR;
-    }
-    // Set default gain
-    if (INA219_SetGain(c->h_i2c, c->addr7, ina219_defaults.gain) != HALIF_OK) {
-        return HALIF_ERROR;
-    }
-    // Set default bus range
-    if (INA219_SetBusRange(c->h_i2c, c->addr7, ina219_defaults.bus_range) != HALIF_OK) {
-        return HALIF_ERROR;
-    }
-    // Set default calibration
-    if (INA219_SetCalibration(c->h_i2c, c->addr7, ina219_defaults.calibration) != HALIF_OK) {
-        return HALIF_ERROR;
-    }
-    // Update context with defaults
-    c->period      = ina219_defaults.period;
-    c->gain        = ina219_defaults.gain;
-    c->bus_range   = ina219_defaults.bus_range;
+    if (INA219_SetPeriod(c->h_i2c, c->addr7, ina219_defaults.period) != HALIF_OK) return HALIF_ERROR;
+    if (INA219_SetGain(c->h_i2c, c->addr7, ina219_defaults.gain) != HALIF_OK) return HALIF_ERROR;
+    if (INA219_SetBusRange(c->h_i2c, c->addr7, ina219_defaults.bus_range) != HALIF_OK) return HALIF_ERROR;
+    if (INA219_SetCalibration(c->h_i2c, c->addr7, ina219_defaults.calibration) != HALIF_OK) return HALIF_ERROR;
+    c->period = ina219_defaults.period;
+    c->gain = ina219_defaults.gain;
+    c->bus_range = ina219_defaults.bus_range;
     c->calibration = ina219_defaults.calibration;
     c->payload_mask = 0x03;  /* default mask */
     return HALIF_OK;
@@ -122,9 +109,7 @@ static const uint8_t ina219_config_fields[] = {
 };
 
 const uint8_t *ina219_get_config_fields(size_t *count) {
-    if (count) {
-        *count = sizeof(ina219_config_fields) / sizeof(ina219_config_fields[0]);
-    }
+    if (count) *count = sizeof(ina219_config_fields) / sizeof(ina219_config_fields[0]);
     return ina219_config_fields;
 }
 
@@ -139,8 +124,8 @@ static uint8_t get_sample_size(void *ctx) {
 }
 
 static const SensorDriver_t ina219_driver = {
-    .init        = (HAL_StatusTypeDef (*)(void *))ini,
-    .read        = (HAL_StatusTypeDef (*)(void *, uint8_t *, uint8_t *))rd,
+    .init        = (HAL_StatusTypeDef (*)(void *)) ini,
+    .read        = (HAL_StatusTypeDef (*)(void *, uint8_t *, uint8_t *)) rd,
     .sample_size = get_sample_size,
     .read_config = ina219_read_config,
 };

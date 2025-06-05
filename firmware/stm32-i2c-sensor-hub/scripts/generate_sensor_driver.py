@@ -53,13 +53,13 @@ def build_driver_header_lines(name: str, meta: dict) -> list[str]:
         "",
         "#include \"task/sensor_task.h\"  /**< SensorDriver_t, SensorSample_t */",
         "#include \"driver_registry.h\"   /**< SensorRegistry_Register */",
-        f"#include \"drivers/{SC}.h\"        /**< HAL-level wrapper */",
-        "#include \"stm32l4xx_hal.h\"       /**< I2C_HandleTypeDef */",
+        f"#include \"drivers/{SC}.h\"        /**< HAL-IF–based wrapper */",
+        "#include <hal_if.h>",
         "#include <stdint.h>",
         "#include <stdbool.h>",
         "",
         "// ---------------- Public callbacks ----------------",
-        f"void {SC}_init_ctx(void *vctx, I2C_HandleTypeDef *hi2c, uint8_t addr7);",
+        f"void {SC}_init_ctx(void *vctx, halif_handle_t h_i2c, uint8_t addr7);",
         f"bool {SC}_configure(void *vctx, uint8_t field_id, uint8_t value);",
         f"bool {SC}_read_config(void *vctx, uint8_t field_id, uint8_t *value);",
         "",
@@ -73,8 +73,8 @@ def build_driver_header_lines(name: str, meta: dict) -> list[str]:
         " * @brief   Context for a sensor instance.",
         " */",
         f"typedef struct {{",
-        "    I2C_HandleTypeDef *hi2c;      /**< I2C handle */",
-        "    uint16_t           addr8;     /**< 8-bit I²C address */"
+        "    halif_handle_t   h_i2c;      /**< HAL-IF handle */",
+        "    uint8_t          addr7;     /**< 7-bit I²C address */"
     ]
 
     # 3a) Add one member per config_field (skip “all”)
@@ -119,13 +119,15 @@ def build_driver_source_lines(name: str, meta: dict) -> list[str]:
     ]
 
     # 4a) ini(): initialize driver (apply defaults + set default mask)
-    lines.append("static HAL_StatusTypeDef ini(void *ctx) {")
+    lines.append("static halif_status_t ini(void *ctx) {")
     lines.append(f"    {ctx_struct} *c = ({ctx_struct} *)ctx;")
     for fld_name in meta.get("config_defaults", {}):
         if fld_name == "all":
             continue
         pascal = "".join(w.capitalize() for w in fld_name.split("_"))
-        lines.append(f"    if ({UPPER}_Set{pascal}(c->hi2c, c->addr8, {SC}_defaults.{fld_name}) != HAL_OK) return HAL_ERROR;")
+        lines.append(
+            f"    if ({UPPER}_Set{pascal}(c->h_i2c, c->addr7, {SC}_defaults.{fld_name}) != HALIF_OK) return HALIF_ERROR;"
+        )
     for fld_name in meta.get("config_defaults", {}):
         if fld_name == "all":
             continue
@@ -136,12 +138,12 @@ def build_driver_source_lines(name: str, meta: dict) -> list[str]:
     for bit in default_bits:
         default_mask |= (1 << bit)
     lines.append(f"    c->payload_mask = 0x{default_mask:02X};  /* default mask */")
-    lines.append("    return HAL_OK;")
+    lines.append("    return HALIF_OK;")
     lines.append("}")
     lines.append("")
 
     # 4b) rd(): pack only selected payload bits into out_buf
-    lines.append("static HAL_StatusTypeDef rd(void *ctx, uint8_t out_buf[], uint8_t *out_len) {")
+    lines.append("static halif_status_t rd(void *ctx, uint8_t out_buf[], uint8_t *out_len) {")
     lines.append(f"    {ctx_struct} *c = ({ctx_struct} *)ctx;")
     lines.append("    uint8_t *cursor = out_buf;")
     lines.append("    uint8_t mask = c->payload_mask;")
@@ -159,9 +161,9 @@ def build_driver_source_lines(name: str, meta: dict) -> list[str]:
         tmp_name = f"var_{pf['name']}"
         lines.extend([
             f"        {ctype} {tmp_name};",
-            f"        if ({read_fn}(c->hi2c, c->addr8, &{tmp_name}) != HAL_OK) {{",
+            f"        if ({read_fn}(c->h_i2c, c->addr7, &{tmp_name}) != HALIF_OK) {{",
             "            *out_len = 0;",
-            "            return HAL_ERROR;",
+            "            return HALIF_ERROR;",
             "        }"
         ])
         if size == 2:
@@ -188,7 +190,7 @@ def build_driver_source_lines(name: str, meta: dict) -> list[str]:
 
     lines.extend([
         "    *out_len = total_bytes;",
-        "    return HAL_OK;",
+        "    return HALIF_OK;",
         "}",
         ""
     ])
@@ -253,10 +255,11 @@ def build_driver_source_lines(name: str, meta: dict) -> list[str]:
     lines.extend(emit_get_sample_size(meta, ctx_struct))
 
     # 4e) vtable + GetDriver()
+    # — Here is where we cast ini and rd into the SensorDriver_t’s expected types:
     lines.extend([
         f"static const SensorDriver_t {vtable_name} = {{",
-        "    .init        = ini,",
-        "    .read        = rd,",
+        f"    .init        = (HAL_StatusTypeDef (*)(void *)) ini,",
+        f"    .read        = (HAL_StatusTypeDef (*)(void *, uint8_t *, uint8_t *)) rd,",
         f"    .sample_size = get_sample_size,",
         f"    .read_config = {SC}_read_config,",
         "};",
@@ -279,13 +282,13 @@ def build_driver_source_lines(name: str, meta: dict) -> list[str]:
     # 4f) SensorDriverInfo_t + RegisterDriver()
     lines.extend([
         f"static const SensorDriverInfo_t {SC}_info = {{",
-        f"    .type_code   = SENSOR_TYPE_{UPPER},",
-        f"    .ctx_size    = sizeof({ctx_struct}),",
-        f"    .init_ctx    = {SC}_init_ctx,",
-        f"    .get_driver  = {UPPER}_GetDriver,",
-        f"    .configure   = {SC}_configure,",
-        f"    .read_config = {SC}_read_config,",
-        f"    .get_config_fields = {'NULL' if not field_ids else f'{SC}_get_config_fields'},",
+        f"    .type_code            = SENSOR_TYPE_{UPPER},",
+        f"    .ctx_size             = sizeof({ctx_struct}),",
+        f"    .init_ctx             = {SC}_init_ctx,",
+        f"    .get_driver           = {UPPER}_GetDriver,",
+        f"    .configure            = {SC}_configure,",
+        f"    .read_config          = {SC}_read_config,",
+        f"    .get_config_fields    = {'NULL' if not field_ids else f'{SC}_get_config_fields'},",
         f"    .get_default_period_ms = {SC}_default_period_ms,  // {default_period} * 100ms",
         "};",
         "",
@@ -297,10 +300,10 @@ def build_driver_source_lines(name: str, meta: dict) -> list[str]:
 
     # 4g) init_ctx() and configure()
     lines.extend([
-        f"void {SC}_init_ctx(void *vctx, I2C_HandleTypeDef *hi2c, uint8_t addr7) {{",
+        f"void {SC}_init_ctx(void *vctx, halif_handle_t h_i2c, uint8_t addr7) {{",
         f"    {ctx_struct} *c = ({ctx_struct} *)vctx;",
-        "    c->hi2c  = hi2c;",
-        "    c->addr8 = addr7 << 1;",
+        "    c->h_i2c  = h_i2c;",
+        "    c->addr7  = addr7;",
         "}",
         ""
     ])
@@ -308,7 +311,7 @@ def build_driver_source_lines(name: str, meta: dict) -> list[str]:
     # 4g2) configure() switch
     lines.append(f"bool {SC}_configure(void *vctx, uint8_t field_id, uint8_t param) {{")
     lines.append(f"    {ctx_struct} *c = ({ctx_struct} *)vctx;")
-    lines.append("    HAL_StatusTypeDef rc;")
+    lines.append("    halif_status_t rc;")
     lines.append("")
     lines.append("    switch (field_id) {")
     for cf in meta.get("config_fields", []):
@@ -320,8 +323,8 @@ def build_driver_source_lines(name: str, meta: dict) -> list[str]:
         pascal = "".join(w.capitalize() for w in fld_name.split("_"))
         lines.extend([
             f"      case {setter}:",
-            f"        rc = {UPPER}_Set{pascal}(c->hi2c, c->addr8, ({UPPER}_{fld_name.upper()}_t)param);",
-            "        if (rc == HAL_OK) {",
+            f"        rc = {UPPER}_Set{pascal}(c->h_i2c, c->addr7, ({UPPER}_{fld_name.upper()}_t)param);",
+            "        if (rc == HALIF_OK) {",
             f"            c->{fld_name} = ({UPPER}_{fld_name.upper()}_t)param;",
             "            return true;",
             "        } else {",
@@ -350,10 +353,10 @@ def gen_sensor_driver_files(meta: dict, out_dir: str):
     Emit:
       • Core/Inc/drivers/<sensor>_driver.h
       • Core/Src/drivers/<sensor>_driver.c
-      • Core/Inc/drivers/<sensor>.h
-      • Core/Src/drivers/<sensor>.c
+      • Core/Inc/drivers/<sensor>.h      (HAL-IF wrapper)
+      • Core/Src/drivers/<sensor>.c      (HAL-IF wrapper)
     """
-    # First generate the HAL-wrapper
+    # First generate the HAL-IF–wrapper
     from .hal_generator import gen_sensor_hal_wrapper
     gen_sensor_hal_wrapper(meta, out_dir)
 

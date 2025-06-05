@@ -32,18 +32,18 @@ def CTYPEDTLS_IF_ARRAY(type_key: str, typedef: str) -> str:
 
 
 # ——————————————————————————————————————————————————————————————————————
-# “HAL-wrapper” code-generation: header + source
+# “HAL-IF–wrapper” code-generation: header + source
 # ——————————————————————————————————————————————————————————————————————
 def build_hal_header_lines(name: str, meta: dict) -> list[str]:
     """
-    Build lines for the HAL-wrapper header: Inc/drivers/<sensor>.h
+    Build lines for the HAL-IF–wrapper header: Inc/drivers/<sensor>.h
     """
     SC = snake_case(name)
     UPPER = name.upper()
     lines = [
         f"/* Auto-generated from {SC}.json; do not edit! */",
         "#pragma once",
-        "#include \"stm32l4xx_hal.h\"",
+        "#include <hal_if.h>",
         "#include <stdint.h>",
         ""
     ]
@@ -113,10 +113,10 @@ def build_hal_header_lines(name: str, meta: dict) -> list[str]:
                 "/**",
                 f" * @brief Write to register 0x{ra:02X} (set {fld_name}).",
                 " */",
-                f"HAL_StatusTypeDef {UPPER}_Set{pascal}(",
-                "    I2C_HandleTypeDef *hi2c,",
-                "    uint16_t           addr8bit,",
-                f"    {typedef}         value",
+                f"halif_status_t {UPPER}_Set{pascal}(",
+                "    halif_handle_t      h_i2c,",
+                "    uint8_t             addr7bit,",
+                f"    {typedef}           value",
                 ");",
                 ""
             ])
@@ -127,10 +127,10 @@ def build_hal_header_lines(name: str, meta: dict) -> list[str]:
                 "/**",
                 f" * @brief Read {fld_name} from register 0x{ra:02X}.",
                 " */",
-                f"HAL_StatusTypeDef {UPPER}_Read{pascal}(",
-                "    I2C_HandleTypeDef *hi2c,",
-                "    uint16_t           addr8bit,",
-                f"    {c_or_alias} *out",
+                f"halif_status_t {UPPER}_Read{pascal}(",
+                "    halif_handle_t      h_i2c,",
+                "    uint8_t             addr7bit,",
+                f"    {c_or_alias}       *out",
                 ");",
                 ""
             ])
@@ -148,10 +148,10 @@ def build_hal_header_lines(name: str, meta: dict) -> list[str]:
                 "/**",
                 " * @brief Set period (handled internally; no register).",
                 " */",
-                f"HAL_StatusTypeDef {UPPER}_SetPeriod(",
-                "    I2C_HandleTypeDef *hi2c,",
-                "    uint16_t           addr8bit,",
-                f"    {typedef}         value",
+                f"halif_status_t {UPPER}_SetPeriod(",
+                "    halif_handle_t      h_i2c,",
+                "    uint8_t             addr7bit,",
+                f"    {typedef}           value",
                 ");",
                 ""
             ])
@@ -166,10 +166,10 @@ def build_hal_header_lines(name: str, meta: dict) -> list[str]:
         size = pf["size"]
         lines.extend([
             f"// Reads {pf['name']} from register 0x{ra:02X}",
-            f"HAL_StatusTypeDef {UPPER}_Read{pascal}(",
-            "    I2C_HandleTypeDef *hi2c,",
-            "    uint16_t           addr8bit,",
-            f"    {ctype}           *out",
+            f"halif_status_t {UPPER}_Read{pascal}(",
+            "    halif_handle_t      h_i2c,",
+            "    uint8_t             addr7bit,",
+            f"    {ctype}            *out",
             ");",
             ""
         ])
@@ -179,14 +179,14 @@ def build_hal_header_lines(name: str, meta: dict) -> list[str]:
 
 def build_hal_source_lines(name: str, meta: dict) -> list[str]:
     """
-    Build lines for the HAL-wrapper implementation: Src/drivers/<sensor>.c
+    Build lines for the HAL-IF–wrapper implementation: Src/drivers/<sensor>.c
     """
     SC = snake_case(name)
     UPPER = name.upper()
     lines = [
         f"/* Auto-generated from {SC}.json; do not edit! */",
         f'#include "drivers/{SC}.h"',
-        "#include \"stm32l4xx_hal.h\"",
+        "#include <hal_if.h>",
         ""
     ]
 
@@ -201,23 +201,23 @@ def build_hal_source_lines(name: str, meta: dict) -> list[str]:
         if setter and ra is not None:
             if size == 1:
                 lines.extend([
-                    f"HAL_StatusTypeDef {UPPER}_Set{pascal}(",
-                    f"I2C_HandleTypeDef *hi2c, uint16_t addr8bit, {UPPER}_{fld_name.upper()}_t value) {{",
+                    f"halif_status_t {UPPER}_Set{pascal}(",
+                    f"    halif_handle_t   h_i2c, uint8_t addr7bit, {UPPER}_{fld_name.upper()}_t value) {{",
                     f"    uint8_t buf[2] = {{ 0x{ra:02X}, (uint8_t)value }};",
-                    "    return HAL_I2C_Master_Transmit(hi2c, addr8bit, buf, 2, 100);",
+                    "    return halif_i2c_write(h_i2c, addr7bit, buf, 2, 100);",
                     "}",
                     ""
                 ])
             else:
                 lines.extend([
-                    f"HAL_StatusTypeDef {UPPER}_Set{pascal}(",
-                    f"I2C_HandleTypeDef *hi2c, uint16_t addr8bit, {UPPER}_{fld_name.upper()}_t value) {{",
+                    f"halif_status_t {UPPER}_Set{pascal}(",
+                    f"    halif_handle_t   h_i2c, uint8_t addr7bit, {UPPER}_{fld_name.upper()}_t value) {{",
                     "    uint8_t buf[3] = {",
                     f"        0x{ra:02X},",
                     f"        (uint8_t)(value >> 8),",
                     f"        (uint8_t)(value & 0xFF)",
                     "    };",
-                    "    return HAL_I2C_Master_Transmit(hi2c, addr8bit, buf, 3, 100);",
+                    "    return halif_i2c_write(h_i2c, addr7bit, buf, 3, 100);",
                     "}",
                     ""
                 ])
@@ -231,13 +231,13 @@ def build_hal_source_lines(name: str, meta: dict) -> list[str]:
             and cf.get("reg_addr") is None
         ):
             lines.extend([
-                f"HAL_StatusTypeDef {UPPER}_SetPeriod(",
-                "    I2C_HandleTypeDef *hi2c,",
-                "    uint16_t           addr8bit,",
-                f"    {UPPER}_PERIOD_t   value",
+                f"halif_status_t {UPPER}_SetPeriod(",
+                "    halif_handle_t   h_i2c,",
+                "    uint8_t          addr7bit,",
+                f"    {UPPER}_PERIOD_t value",
                 ") {",
-                "    (void)hi2c; (void)addr8bit; (void)value;",
-                "    return HAL_OK;  // Period is handled internally",
+                "    (void)h_i2c; (void)addr7bit; (void)value;",
+                "    return HALIF_OK;  // Period is handled internally",
                 "}",
                 ""
             ])
@@ -254,23 +254,23 @@ def build_hal_source_lines(name: str, meta: dict) -> list[str]:
             base_key = cf["type"].replace("[", "").replace("]", "")
             ctype = CTYPE.get(base_key, "uint16_t")
             lines.extend([
-                f"HAL_StatusTypeDef {UPPER}_Read{pascal}(",
-                f"I2C_HandleTypeDef *hi2c, uint16_t addr8bit, {ctype} *out) {{",
+                f"halif_status_t {UPPER}_Read{pascal}(",
+                f"    halif_handle_t   h_i2c, uint8_t addr7bit, {ctype} *out) {{",
                 f"    uint8_t cmd = 0x{ra:02X};",
                 f"    uint8_t data[{size}];",
-                "    if (HAL_I2C_Master_Transmit(hi2c, addr8bit, &cmd, 1, 100) != HAL_OK) return HAL_ERROR;",
-                f"    if (HAL_I2C_Master_Receive(hi2c, addr8bit, data, {size}, 100) != HAL_OK) return HAL_ERROR;",
+                "    if (halif_i2c_write(h_i2c, addr7bit, &cmd, 1, 100) != HALIF_OK) return HALIF_ERROR;",
+                f"    if (halif_i2c_read(h_i2c, addr7bit, data, {size}, 100) != HALIF_OK) return HALIF_ERROR;",
             ])
             if size == 1:
                 lines.append("    *out = data[0];")
             else:
-                lines.append("    uint16_t raw = (data[0] << 8) | data[1];")
+                lines.append("    uint16_t raw = ((uint16_t)data[0] << 8) | data[1];")
                 if cf.get("shift", 0) > 0:
                     lines.append(f"    raw = raw >> {cf['shift']};")
                 if cf.get("mask"):
                     lines.append(f"    raw = raw & {cf['mask']};")
                 lines.append("    *out = raw;")
-            lines.append("    return HAL_OK;")
+            lines.append("    return HALIF_OK;")
             lines.append("}")
             lines.append("")
 
@@ -284,23 +284,27 @@ def build_hal_source_lines(name: str, meta: dict) -> list[str]:
         scale = pf.get("scale_factor", 1)
 
         lines.extend([
-            f"HAL_StatusTypeDef {UPPER}_Read{pascal}(",
-            f"I2C_HandleTypeDef *hi2c, uint16_t addr8bit, {ctype} *out) {{",
+            f"halif_status_t {UPPER}_Read{pascal}(",
+            f"    halif_handle_t   h_i2c, uint8_t addr7bit, {ctype} *out) {{",
             f"    uint8_t cmd = REG_{tok};",
             f"    uint8_t data[{size}];",
-            "    if (HAL_I2C_Master_Transmit(hi2c, addr8bit, &cmd, 1, 100) != HAL_OK) return HAL_ERROR;",
-            f"    if (HAL_I2C_Master_Receive(hi2c, addr8bit, data, {size}, 100) != HAL_OK) return HAL_ERROR;",
+            "    if (halif_i2c_write(h_i2c, addr7bit, &cmd, 1, 100) != HALIF_OK) return HALIF_ERROR;",
+            f"    if (halif_i2c_read(h_i2c, addr7bit, data, {size}, 100) != HALIF_OK) return HALIF_ERROR;",
         ])
         if size == 2:
-            lines.append("    uint16_t raw = (data[0] << 8) | data[1];")
+            lines.append("    uint16_t raw = ((uint16_t)data[0] << 8) | data[1];")
         else:
-            lines.append("    uint32_t raw = ((uint32_t)data[0] << 24) | ((uint32_t)data[1] << 16) | ((uint32_t)data[2] << 8) | data[3];")
+            lines.append(
+                "    uint32_t raw = "
+                "((uint32_t)data[0] << 24) | ((uint32_t)data[1] << 16) "
+                "| ((uint32_t)data[2] << 8) | data[3];"
+            )
         if pf.get("shift", 0) > 0:
             lines.append(f"    raw = raw >> {pf['shift']};")
         if pf.get("mask"):
             lines.append(f"    raw = raw & {pf['mask']};")
         lines.append(f"    *out = raw * {scale};")
-        lines.append("    return HAL_OK;")
+        lines.append("    return HALIF_OK;")
         lines.append("}")
 
     return lines
