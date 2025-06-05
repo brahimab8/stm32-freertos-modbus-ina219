@@ -25,6 +25,7 @@
 */
 
 #include "config/protocol.h"   // for RESPONSE_HEADER_t, RESPONSE_HEADER_LENGTH, CHECKSUM_LENGTH
+#include "config/config.h"      // for BOARD_ID
 #include "task/sensor_manager.h" // for SensorSample_t, SM_Entry_t, etc.
 
 /**
