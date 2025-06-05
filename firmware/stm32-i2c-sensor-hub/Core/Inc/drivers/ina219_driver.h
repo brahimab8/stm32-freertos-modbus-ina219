@@ -3,13 +3,13 @@
 
 #include "task/sensor_task.h"  /**< SensorDriver_t, SensorSample_t */
 #include "driver_registry.h"   /**< SensorRegistry_Register */
-#include "drivers/ina219.h"        /**< HAL-level wrapper */
-#include "stm32l4xx_hal.h"       /**< I2C_HandleTypeDef */
+#include "drivers/ina219.h"        /**< HAL-IF–based wrapper */
+#include <hal_if.h>
 #include <stdint.h>
 #include <stdbool.h>
 
 // ---------------- Public callbacks ----------------
-void ina219_init_ctx(void *vctx, I2C_HandleTypeDef *hi2c, uint8_t addr7);
+void ina219_init_ctx(void *vctx, halif_handle_t h_i2c, uint8_t addr7);
 bool ina219_configure(void *vctx, uint8_t field_id, uint8_t value);
 bool ina219_read_config(void *vctx, uint8_t field_id, uint8_t *value);
 
@@ -23,8 +23,8 @@ void ina219_RegisterDriver(void);
  * @brief   Context for a sensor instance.
  */
 typedef struct {
-    I2C_HandleTypeDef *hi2c;      /**< I2C handle */
-    uint16_t           addr8;     /**< 8-bit I²C address */
+    halif_handle_t   h_i2c;      /**< HAL-IF handle */
+    uint8_t          addr7;     /**< 7-bit I²C address */
     INA219_PERIOD_t period;
     INA219_GAIN_t gain;
     INA219_BUS_RANGE_t bus_range;

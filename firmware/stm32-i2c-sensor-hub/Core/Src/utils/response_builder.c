@@ -1,7 +1,5 @@
 #include "utils/response_builder.h"
 #include "utils/checksum.h"       // for xor_checksum( buf, start_index, end_index )
-#include "config/protocol.h"      // for RESPONSE_HEADER_t, RESPONSE_HEADER_LENGTH, CHECKSUM_LENGTH, SOF_MARKER
-#include "config/config.h"      // for BOARD_ID
 #include <string.h>               // for memcpy
 
 /**

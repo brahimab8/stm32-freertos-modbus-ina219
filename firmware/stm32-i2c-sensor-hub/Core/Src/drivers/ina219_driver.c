@@ -5,21 +5,21 @@
 #include <string.h>
 #include <stdbool.h>
 
-static HAL_StatusTypeDef ini(void *ctx) {
+static halif_status_t ini(void *ctx) {
     INA219_Ctx_t *c = (INA219_Ctx_t *)ctx;
-    if (INA219_SetPeriod(c->hi2c, c->addr8, ina219_defaults.period) != HAL_OK) return HAL_ERROR;
-    if (INA219_SetGain(c->hi2c, c->addr8, ina219_defaults.gain) != HAL_OK) return HAL_ERROR;
-    if (INA219_SetBusRange(c->hi2c, c->addr8, ina219_defaults.bus_range) != HAL_OK) return HAL_ERROR;
-    if (INA219_SetCalibration(c->hi2c, c->addr8, ina219_defaults.calibration) != HAL_OK) return HAL_ERROR;
+    if (INA219_SetPeriod(c->h_i2c, c->addr7, ina219_defaults.period) != HALIF_OK) return HALIF_ERROR;
+    if (INA219_SetGain(c->h_i2c, c->addr7, ina219_defaults.gain) != HALIF_OK) return HALIF_ERROR;
+    if (INA219_SetBusRange(c->h_i2c, c->addr7, ina219_defaults.bus_range) != HALIF_OK) return HALIF_ERROR;
+    if (INA219_SetCalibration(c->h_i2c, c->addr7, ina219_defaults.calibration) != HALIF_OK) return HALIF_ERROR;
     c->period = ina219_defaults.period;
     c->gain = ina219_defaults.gain;
     c->bus_range = ina219_defaults.bus_range;
     c->calibration = ina219_defaults.calibration;
     c->payload_mask = 0x03;  /* default mask */
-    return HAL_OK;
+    return HALIF_OK;
 }
 
-static HAL_StatusTypeDef rd(void *ctx, uint8_t out_buf[], uint8_t *out_len) {
+static halif_status_t rd(void *ctx, uint8_t out_buf[], uint8_t *out_len) {
     INA219_Ctx_t *c = (INA219_Ctx_t *)ctx;
     uint8_t *cursor = out_buf;
     uint8_t mask = c->payload_mask;
@@ -27,9 +27,9 @@ static HAL_StatusTypeDef rd(void *ctx, uint8_t out_buf[], uint8_t *out_len) {
 
     if (mask & BIT_BUS_VOLTAGE_MV) {
         uint16_t var_bus_voltage_mV;
-        if (INA219_ReadBusVoltageMv(c->hi2c, c->addr8, &var_bus_voltage_mV) != HAL_OK) {
+        if (INA219_ReadBusVoltageMv(c->h_i2c, c->addr7, &var_bus_voltage_mV) != HALIF_OK) {
             *out_len = 0;
-            return HAL_ERROR;
+            return HALIF_ERROR;
         }
         *cursor++ = (uint8_t)(var_bus_voltage_mV >> 8);
         *cursor++ = (uint8_t)(var_bus_voltage_mV & 0xFF);
@@ -38,9 +38,9 @@ static HAL_StatusTypeDef rd(void *ctx, uint8_t out_buf[], uint8_t *out_len) {
 
     if (mask & BIT_SHUNT_VOLTAGE_UV) {
         int16_t var_shunt_voltage_uV;
-        if (INA219_ReadShuntVoltageUv(c->hi2c, c->addr8, &var_shunt_voltage_uV) != HAL_OK) {
+        if (INA219_ReadShuntVoltageUv(c->h_i2c, c->addr7, &var_shunt_voltage_uV) != HALIF_OK) {
             *out_len = 0;
-            return HAL_ERROR;
+            return HALIF_ERROR;
         }
         *cursor++ = (uint8_t)(var_shunt_voltage_uV >> 8);
         *cursor++ = (uint8_t)(var_shunt_voltage_uV & 0xFF);
@@ -49,9 +49,9 @@ static HAL_StatusTypeDef rd(void *ctx, uint8_t out_buf[], uint8_t *out_len) {
 
     if (mask & BIT_CURRENT_UA) {
         int16_t var_current_uA;
-        if (INA219_ReadCurrentUa(c->hi2c, c->addr8, &var_current_uA) != HAL_OK) {
+        if (INA219_ReadCurrentUa(c->h_i2c, c->addr7, &var_current_uA) != HALIF_OK) {
             *out_len = 0;
-            return HAL_ERROR;
+            return HALIF_ERROR;
         }
         *cursor++ = (uint8_t)(var_current_uA >> 8);
         *cursor++ = (uint8_t)(var_current_uA & 0xFF);
@@ -60,9 +60,9 @@ static HAL_StatusTypeDef rd(void *ctx, uint8_t out_buf[], uint8_t *out_len) {
 
     if (mask & BIT_POWER_MW) {
         uint16_t var_power_mW;
-        if (INA219_ReadPowerMw(c->hi2c, c->addr8, &var_power_mW) != HAL_OK) {
+        if (INA219_ReadPowerMw(c->h_i2c, c->addr7, &var_power_mW) != HALIF_OK) {
             *out_len = 0;
-            return HAL_ERROR;
+            return HALIF_ERROR;
         }
         *cursor++ = (uint8_t)(var_power_mW >> 8);
         *cursor++ = (uint8_t)(var_power_mW & 0xFF);
@@ -70,7 +70,7 @@ static HAL_StatusTypeDef rd(void *ctx, uint8_t out_buf[], uint8_t *out_len) {
     }
 
     *out_len = total_bytes;
-    return HAL_OK;
+    return HALIF_OK;
 }
 
 bool ina219_read_config(void *vctx, uint8_t field, uint8_t *out) {
@@ -124,8 +124,8 @@ static uint8_t get_sample_size(void *ctx) {
 }
 
 static const SensorDriver_t ina219_driver = {
-    .init        = ini,
-    .read        = rd,
+    .init        = (HAL_StatusTypeDef (*)(void *)) ini,
+    .read        = (HAL_StatusTypeDef (*)(void *, uint8_t *, uint8_t *)) rd,
     .sample_size = get_sample_size,
     .read_config = ina219_read_config,
 };
@@ -139,13 +139,13 @@ static uint32_t ina219_default_period_ms(void) {
 }
 
 static const SensorDriverInfo_t ina219_info = {
-    .type_code   = SENSOR_TYPE_INA219,
-    .ctx_size    = sizeof(INA219_Ctx_t),
-    .init_ctx    = ina219_init_ctx,
-    .get_driver  = INA219_GetDriver,
-    .configure   = ina219_configure,
-    .read_config = ina219_read_config,
-    .get_config_fields = ina219_get_config_fields,
+    .type_code            = SENSOR_TYPE_INA219,
+    .ctx_size             = sizeof(INA219_Ctx_t),
+    .init_ctx             = ina219_init_ctx,
+    .get_driver           = INA219_GetDriver,
+    .configure            = ina219_configure,
+    .read_config          = ina219_read_config,
+    .get_config_fields    = ina219_get_config_fields,
     .get_default_period_ms = ina219_default_period_ms,  // 5 * 100ms
 };
 
@@ -153,20 +153,20 @@ void ina219_RegisterDriver(void) {
     SensorRegistry_Register(&ina219_info);
 }
 
-void ina219_init_ctx(void *vctx, I2C_HandleTypeDef *hi2c, uint8_t addr7) {
+void ina219_init_ctx(void *vctx, halif_handle_t h_i2c, uint8_t addr7) {
     INA219_Ctx_t *c = (INA219_Ctx_t *)vctx;
-    c->hi2c  = hi2c;
-    c->addr8 = addr7 << 1;
+    c->h_i2c  = h_i2c;
+    c->addr7  = addr7;
 }
 
 bool ina219_configure(void *vctx, uint8_t field_id, uint8_t param) {
     INA219_Ctx_t *c = (INA219_Ctx_t *)vctx;
-    HAL_StatusTypeDef rc;
+    halif_status_t rc;
 
     switch (field_id) {
       case CMD_SET_PERIOD:
-        rc = INA219_SetPeriod(c->hi2c, c->addr8, (INA219_PERIOD_t)param);
-        if (rc == HAL_OK) {
+        rc = INA219_SetPeriod(c->h_i2c, c->addr7, (INA219_PERIOD_t)param);
+        if (rc == HALIF_OK) {
             c->period = (INA219_PERIOD_t)param;
             return true;
         } else {
@@ -174,8 +174,8 @@ bool ina219_configure(void *vctx, uint8_t field_id, uint8_t param) {
         }
 
       case CMD_SET_GAIN:
-        rc = INA219_SetGain(c->hi2c, c->addr8, (INA219_GAIN_t)param);
-        if (rc == HAL_OK) {
+        rc = INA219_SetGain(c->h_i2c, c->addr7, (INA219_GAIN_t)param);
+        if (rc == HALIF_OK) {
             c->gain = (INA219_GAIN_t)param;
             return true;
         } else {
@@ -183,8 +183,8 @@ bool ina219_configure(void *vctx, uint8_t field_id, uint8_t param) {
         }
 
       case CMD_SET_RANGE:
-        rc = INA219_SetBusRange(c->hi2c, c->addr8, (INA219_BUS_RANGE_t)param);
-        if (rc == HAL_OK) {
+        rc = INA219_SetBusRange(c->h_i2c, c->addr7, (INA219_BUS_RANGE_t)param);
+        if (rc == HALIF_OK) {
             c->bus_range = (INA219_BUS_RANGE_t)param;
             return true;
         } else {
@@ -192,8 +192,8 @@ bool ina219_configure(void *vctx, uint8_t field_id, uint8_t param) {
         }
 
       case CMD_SET_CAL:
-        rc = INA219_SetCalibration(c->hi2c, c->addr8, (INA219_CALIBRATION_t)param);
-        if (rc == HAL_OK) {
+        rc = INA219_SetCalibration(c->h_i2c, c->addr7, (INA219_CALIBRATION_t)param);
+        if (rc == HALIF_OK) {
             c->calibration = (INA219_CALIBRATION_t)param;
             return true;
         } else {

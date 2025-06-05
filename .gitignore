@@ -32,3 +32,14 @@ venv/
 *.iml
 .vscode/
 *.swp
+
+# Test objects and executables
+*.o
+test_response_runner
+test_drivers_runner
+
+# Coverage
+*.gcda
+*.gcno
+coverage.info
+coverage-report/
