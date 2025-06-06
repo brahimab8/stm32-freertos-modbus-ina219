@@ -89,7 +89,7 @@
     {
       "name":        "calibration",
       "getter_cmd":  "CMD_GET_CAL",
-      "setter_cmd":  "CMD_SET_CAL",
+      "setter_cmd":  "null",
       "type":        "uint16",
       "size":        2,
       "reg_addr":    5,
