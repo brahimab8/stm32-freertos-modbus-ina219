@@ -282,7 +282,7 @@ def stream(ctx, interval):
     backend.start_stream(_cb)
 
     try:
-        while backend.mode == "stream":
+        while backend.mode == Mode.STREAM:
             time.sleep(interval)
     except KeyboardInterrupt:
         backend.stop_stream()

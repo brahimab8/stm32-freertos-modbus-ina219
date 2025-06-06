@@ -35,6 +35,7 @@ class SensorShell(cmd.Cmd):
     # --- Config / connection commands ---
 
     def do_port(self, arg):
+        """Set the serial port."""
         try:
             p = shlex.split(arg)[0]
             self.backend.board_mgr.port = p
@@ -42,6 +43,7 @@ class SensorShell(cmd.Cmd):
             print("Error setting port:", e)
 
     def do_baud(self, arg):
+        """Set the baud rate."""
         try:
             b = int(shlex.split(arg)[0])
             self.backend.board_mgr.baud = b
@@ -51,12 +53,14 @@ class SensorShell(cmd.Cmd):
     # --- Board & sensor selection ---
 
     def do_board(self, arg):
+        """Set the current board ID."""
         try:
             self.current_board = int(shlex.split(arg)[0], 0)
         except Exception as e:
             print("Error setting board ID:", e)
 
     def do_sensor(self, arg):
+        """Select the current sensor and address."""
         if self.current_board is None:
             print("Select a board first:  board <id>")
             return
@@ -380,7 +384,15 @@ class SensorShell(cmd.Cmd):
             md = registry.metadata(name)
             print(f"{name} → defaults {md.get('config_defaults', {})}")
 
-    def do_quit(self, arg): return True
-    def do_exit(self, arg): return True
-    def do_EOF(self, arg):  return True
+    def do_quit(self, arg):
+        """Exit the shell."""
+        return True
+    
+    def do_exit(self, arg):
+        """Exit the shell."""
+        return True
+    
+    def do_EOF(self, arg):  
+        """Exit the shell (Ctrl-D)."""
+        return True
 
