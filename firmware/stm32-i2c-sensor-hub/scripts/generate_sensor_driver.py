@@ -101,7 +101,10 @@ def build_driver_header_lines(name: str, meta: dict) -> list[str]:
 
 def build_driver_source_lines(name: str, meta: dict) -> list[str]:
     """
-    Build lines for the driver-layer implementation: Src/drivers/<sensor>_driver.c
+    Build lines for the driver-layer implementation:Src/drivers/<sensor>_driver.c
+
+    - Fields with "computed": true (and a "formula" + "depends_on" list)
+      get automatically recalculated whenever any dependency setter is called.
     """
     SC = snake_case(name)
     UPPER = name.upper()
@@ -255,7 +258,6 @@ def build_driver_source_lines(name: str, meta: dict) -> list[str]:
     lines.extend(emit_get_sample_size(meta, ctx_struct))
 
     # 4e) vtable + GetDriver()
-    # — Here is where we cast ini and rd into the SensorDriver_t’s expected types:
     lines.extend([
         f"static const SensorDriver_t {vtable_name} = {{",
         f"    .init        = (HAL_StatusTypeDef (*)(void *)) ini,",
@@ -308,7 +310,16 @@ def build_driver_source_lines(name: str, meta: dict) -> list[str]:
         ""
     ])
 
-    # 4g2) configure() switch
+    # Gather “computed” fields, their dependencies, and raw formulas
+    computed_info = {}
+    for cf in meta.get("config_fields", []):
+        if cf.get("computed", False):
+            computed_info[cf["name"]] = {
+                "depends_on": cf.get("depends_on", []),
+                "formula":    cf.get("formula", "").strip()
+            }
+
+    # 4g2) configure() switch, injecting computed logic
     lines.append(f"bool {SC}_configure(void *vctx, uint8_t field_id, uint8_t param) {{")
     lines.append(f"    {ctx_struct} *c = ({ctx_struct} *)vctx;")
     lines.append("    halif_status_t rc;")
@@ -316,16 +327,33 @@ def build_driver_source_lines(name: str, meta: dict) -> list[str]:
     lines.append("    switch (field_id) {")
     for cf in meta.get("config_fields", []):
         fld_name = cf["name"]
-        setter = cf.get("setter_cmd")
-        size = cf.get("size")
-        if not setter:
+        setter_cmd = cf.get("setter_cmd")
+        is_computed = cf.get("computed", False)
+
+        # Skip any field with no setter_cmd or itself computed
+        if not setter_cmd or is_computed:
             continue
         pascal = "".join(w.capitalize() for w in fld_name.split("_"))
         lines.extend([
-            f"      case {setter}:",
+            f"      case {setter_cmd}:",
             f"        rc = {UPPER}_Set{pascal}(c->h_i2c, c->addr7, ({UPPER}_{fld_name.upper()}_t)param);",
             "        if (rc == HALIF_OK) {",
             f"            c->{fld_name} = ({UPPER}_{fld_name.upper()}_t)param;",
+            ""
+        ])
+        # Recompute any “computed” fields that depend on fld_name
+        for comp_name, info in computed_info.items():
+            if fld_name in info["depends_on"]:
+                raw = info["formula"]
+                # Assign the computed field using the raw formula string
+                lines.append(f"            // Recompute `{comp_name}` because `{fld_name}` changed")
+                lines.append(f"            c->{comp_name} = {raw};")
+                # Now push it out via the HAL-IF setter:
+                comp_pascal = comp_name.capitalize()
+                lines.append(f"            {UPPER}_Set{comp_pascal}(c->h_i2c, c->addr7, c->{comp_name});")
+                lines.append("")
+
+        lines.extend([
             "            return true;",
             "        } else {",
             "            return false;",

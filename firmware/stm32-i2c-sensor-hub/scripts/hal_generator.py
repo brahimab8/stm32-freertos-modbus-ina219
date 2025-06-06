@@ -71,6 +71,7 @@ def build_hal_header_lines(name: str, meta: dict) -> list[str]:
             lines.append(f"}} {typedef};")
         else:
             lines.append(f"typedef {base_type} {typedef};")
+    lines.append("")
 
     # 1b) config_field register-address defines
     for cf in meta.get("config_fields", []):
@@ -108,19 +109,34 @@ def build_hal_header_lines(name: str, meta: dict) -> list[str]:
         ra = cf.get("reg_addr")
         size = cf.get("size")
 
-        if setter and ra is not None:
-            lines.extend([
-                "/**",
-                f" * @brief Write to register 0x{ra:02X} (set {fld_name}).",
-                " */",
-                f"halif_status_t {UPPER}_Set{pascal}(",
-                "    halif_handle_t      h_i2c,",
-                "    uint8_t             addr7bit,",
-                f"    {typedef}           value",
-                ");",
-                ""
-            ])
+        # If there is a setter_cmd, emit a prototype (real or no-op)
+        if setter:
+            if ra is not None:
+                lines.extend([
+                    "/**",
+                    f" * @brief Write to register 0x{ra:02X} (set {fld_name}).",
+                    " */",
+                    f"halif_status_t {UPPER}_Set{pascal}(",
+                    "    halif_handle_t      h_i2c,",
+                    "    uint8_t             addr7bit,",
+                    f"    {typedef}           value",
+                    ");",
+                    ""
+                ])
+            else:
+                lines.extend([
+                    "/**",
+                    f" * @brief (no-op) software-only setter for {fld_name}.",
+                    " */",
+                    f"halif_status_t {UPPER}_Set{pascal}(",
+                    "    halif_handle_t      h_i2c,",
+                    "    uint8_t             addr7bit,",
+                    f"    {typedef}           value",
+                    ");",
+                    ""
+                ])
 
+        # If there is a getter_cmd and reg_addr != null, emit a real prototype
         if getter and ra is not None:
             c_or_alias = CTYPEDTLS_IF_ARRAY(cf["type"], typedef)
             lines.extend([
@@ -131,27 +147,6 @@ def build_hal_header_lines(name: str, meta: dict) -> list[str]:
                 "    halif_handle_t      h_i2c,",
                 "    uint8_t             addr7bit,",
                 f"    {c_or_alias}       *out",
-                ");",
-                ""
-            ])
-
-    # Special case: SetPeriod with no reg_addr but driver_side=true
-    for cf in meta.get("config_fields", []):
-        if (
-            cf["name"] == "period"
-            and cf.get("driver_side")
-            and cf.get("setter_cmd")
-            and cf.get("reg_addr") is None
-        ):
-            typedef = f"{UPPER}_PERIOD_t"
-            lines.extend([
-                "/**",
-                " * @brief Set period (handled internally; no register).",
-                " */",
-                f"halif_status_t {UPPER}_SetPeriod(",
-                "    halif_handle_t      h_i2c,",
-                "    uint8_t             addr7bit,",
-                f"    {typedef}           value",
                 ");",
                 ""
             ])
@@ -198,49 +193,44 @@ def build_hal_source_lines(name: str, meta: dict) -> list[str]:
         size = cf.get("size")
         setter = cf.get("setter_cmd")
 
-        if setter and ra is not None:
-            if size == 1:
-                lines.extend([
-                    f"halif_status_t {UPPER}_Set{pascal}(",
-                    f"    halif_handle_t   h_i2c, uint8_t addr7bit, {UPPER}_{fld_name.upper()}_t value) {{",
-                    f"    uint8_t buf[2] = {{ 0x{ra:02X}, (uint8_t)value }};",
-                    "    return halif_i2c_write(h_i2c, addr7bit, buf, 2, 100);",
-                    "}",
-                    ""
-                ])
+        if setter:
+            if ra is not None:
+                # Real I²C write
+                if size == 1:
+                    lines.extend([
+                        f"halif_status_t {UPPER}_Set{pascal}(",
+                        f"    halif_handle_t   h_i2c, uint8_t addr7bit, {UPPER}_{fld_name.upper()}_t value) {{",
+                        f"    uint8_t buf[2] = {{ 0x{ra:02X}, (uint8_t)value }};",
+                        "    return halif_i2c_write(h_i2c, addr7bit, buf, 2, 100);",
+                        "}",
+                        ""
+                    ])
+                else:
+                    lines.extend([
+                        f"halif_status_t {UPPER}_Set{pascal}(",
+                        f"    halif_handle_t   h_i2c, uint8_t addr7bit, {UPPER}_{fld_name.upper()}_t value) {{",
+                        "    uint8_t buf[3] = {",
+                        f"        0x{ra:02X},",
+                        f"        (uint8_t)(value >> 8),",
+                        f"        (uint8_t)(value & 0xFF)",
+                        "    };",
+                        "    return halif_i2c_write(h_i2c, addr7bit, buf, 3, 100);",
+                        "}",
+                        ""
+                    ])
             else:
+                # No-op stub (software-only field)
                 lines.extend([
                     f"halif_status_t {UPPER}_Set{pascal}(",
-                    f"    halif_handle_t   h_i2c, uint8_t addr7bit, {UPPER}_{fld_name.upper()}_t value) {{",
-                    "    uint8_t buf[3] = {",
-                    f"        0x{ra:02X},",
-                    f"        (uint8_t)(value >> 8),",
-                    f"        (uint8_t)(value & 0xFF)",
-                    "    };",
-                    "    return halif_i2c_write(h_i2c, addr7bit, buf, 3, 100);",
+                    "    halif_handle_t   h_i2c,",
+                    "    uint8_t          addr7bit,",
+                    f"    {UPPER}_{fld_name.upper()}_t value",
+                    ") {",
+                    "    (void)h_i2c; (void)addr7bit; (void)value;  // no register behind this field",
+                    "    return HALIF_OK;",
                     "}",
                     ""
                 ])
-
-    # Special case: stub for SetPeriod with no reg_addr
-    for cf in meta.get("config_fields", []):
-        if (
-            cf["name"] == "period"
-            and cf.get("driver_side")
-            and cf.get("setter_cmd")
-            and cf.get("reg_addr") is None
-        ):
-            lines.extend([
-                f"halif_status_t {UPPER}_SetPeriod(",
-                "    halif_handle_t   h_i2c,",
-                "    uint8_t          addr7bit,",
-                f"    {UPPER}_PERIOD_t value",
-                ") {",
-                "    (void)h_i2c; (void)addr7bit; (void)value;",
-                "    return HALIF_OK;  // Period is handled internally",
-                "}",
-                ""
-            ])
 
     # 2b) Implement Read<Pascal>()
     for cf in meta.get("config_fields", []):

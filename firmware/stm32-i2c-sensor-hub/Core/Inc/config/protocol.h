@@ -30,11 +30,14 @@
 #define CMD_SET_PERIOD       20
 #define CMD_SET_GAIN         21
 #define CMD_SET_RANGE        22
-#define CMD_SET_CAL          23
+#define CMD_SET_SHUNT        24
+#define CMD_SET_CURRENT_LSB  25
 #define CMD_GET_PERIOD       30
 #define CMD_GET_GAIN         31
 #define CMD_GET_RANGE        32
 #define CMD_GET_CAL          33
+#define CMD_GET_SHUNT        34
+#define CMD_GET_CURRENT_LSB  35
 
 // Command ID ranges
 #define CMD_CONFIG_SETTERS_START       20

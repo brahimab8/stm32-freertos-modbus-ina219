@@ -10,11 +10,13 @@ static halif_status_t ini(void *ctx) {
     if (INA219_SetPeriod(c->h_i2c, c->addr7, ina219_defaults.period) != HALIF_OK) return HALIF_ERROR;
     if (INA219_SetGain(c->h_i2c, c->addr7, ina219_defaults.gain) != HALIF_OK) return HALIF_ERROR;
     if (INA219_SetBusRange(c->h_i2c, c->addr7, ina219_defaults.bus_range) != HALIF_OK) return HALIF_ERROR;
-    if (INA219_SetCalibration(c->h_i2c, c->addr7, ina219_defaults.calibration) != HALIF_OK) return HALIF_ERROR;
+    if (INA219_SetShuntMilliohm(c->h_i2c, c->addr7, ina219_defaults.shunt_milliohm) != HALIF_OK) return HALIF_ERROR;
+    if (INA219_SetCurrentLsbUa(c->h_i2c, c->addr7, ina219_defaults.current_lsb_uA) != HALIF_OK) return HALIF_ERROR;
     c->period = ina219_defaults.period;
     c->gain = ina219_defaults.gain;
     c->bus_range = ina219_defaults.bus_range;
-    c->calibration = ina219_defaults.calibration;
+    c->shunt_milliohm = ina219_defaults.shunt_milliohm;
+    c->current_lsb_uA = ina219_defaults.current_lsb_uA;
     c->payload_mask = 0x03;  /* default mask */
     return HALIF_OK;
 }
@@ -88,6 +90,14 @@ bool ina219_read_config(void *vctx, uint8_t field, uint8_t *out) {
         *out = (uint8_t)c->bus_range;
         return true;
 
+      case CMD_GET_SHUNT:
+        *out = (uint8_t)c->shunt_milliohm;
+        return true;
+
+      case CMD_GET_CURRENT_LSB:
+        *out = (uint8_t)c->current_lsb_uA;
+        return true;
+
       case CMD_GET_CAL:
         *out = (uint8_t)(c->calibration & 0xFF);
         return true;
@@ -105,6 +115,8 @@ static const uint8_t ina219_config_fields[] = {
     CMD_GET_PERIOD,
     CMD_GET_GAIN,
     CMD_GET_RANGE,
+    CMD_GET_SHUNT,
+    CMD_GET_CURRENT_LSB,
     CMD_GET_CAL,
 };
 
@@ -168,6 +180,7 @@ bool ina219_configure(void *vctx, uint8_t field_id, uint8_t param) {
         rc = INA219_SetPeriod(c->h_i2c, c->addr7, (INA219_PERIOD_t)param);
         if (rc == HALIF_OK) {
             c->period = (INA219_PERIOD_t)param;
+
             return true;
         } else {
             return false;
@@ -177,6 +190,7 @@ bool ina219_configure(void *vctx, uint8_t field_id, uint8_t param) {
         rc = INA219_SetGain(c->h_i2c, c->addr7, (INA219_GAIN_t)param);
         if (rc == HALIF_OK) {
             c->gain = (INA219_GAIN_t)param;
+
             return true;
         } else {
             return false;
@@ -186,15 +200,35 @@ bool ina219_configure(void *vctx, uint8_t field_id, uint8_t param) {
         rc = INA219_SetBusRange(c->h_i2c, c->addr7, (INA219_BUS_RANGE_t)param);
         if (rc == HALIF_OK) {
             c->bus_range = (INA219_BUS_RANGE_t)param;
+
             return true;
         } else {
             return false;
         }
 
-      case CMD_SET_CAL:
-        rc = INA219_SetCalibration(c->h_i2c, c->addr7, (INA219_CALIBRATION_t)param);
+      case CMD_SET_SHUNT:
+        rc = INA219_SetShuntMilliohm(c->h_i2c, c->addr7, (INA219_SHUNT_MILLIOHM_t)param);
         if (rc == HALIF_OK) {
-            c->calibration = (INA219_CALIBRATION_t)param;
+            c->shunt_milliohm = (INA219_SHUNT_MILLIOHM_t)param;
+
+            // Recompute `calibration` because `shunt_milliohm` changed
+            c->calibration = ((uint16_t)(0.04096f / (((float)c->current_lsb_uA / 1e6f) * ((float)c->shunt_milliohm / 1000.0f)) + 0.5f));
+            INA219_SetCalibration(c->h_i2c, c->addr7, c->calibration);
+
+            return true;
+        } else {
+            return false;
+        }
+
+      case CMD_SET_CURRENT_LSB:
+        rc = INA219_SetCurrentLsbUa(c->h_i2c, c->addr7, (INA219_CURRENT_LSB_UA_t)param);
+        if (rc == HALIF_OK) {
+            c->current_lsb_uA = (INA219_CURRENT_LSB_UA_t)param;
+
+            // Recompute `calibration` because `current_lsb_uA` changed
+            c->calibration = ((uint16_t)(0.04096f / (((float)c->current_lsb_uA / 1e6f) * ((float)c->shunt_milliohm / 1000.0f)) + 0.5f));
+            INA219_SetCalibration(c->h_i2c, c->addr7, c->calibration);
+
             return true;
         } else {
             return false;

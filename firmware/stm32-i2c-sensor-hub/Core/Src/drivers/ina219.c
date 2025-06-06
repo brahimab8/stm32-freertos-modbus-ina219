@@ -2,6 +2,15 @@
 #include "drivers/ina219.h"
 #include <hal_if.h>
 
+halif_status_t INA219_SetPeriod(
+    halif_handle_t   h_i2c,
+    uint8_t          addr7bit,
+    INA219_PERIOD_t value
+) {
+    (void)h_i2c; (void)addr7bit; (void)value;  // no register behind this field
+    return HALIF_OK;
+}
+
 halif_status_t INA219_SetGain(
     halif_handle_t   h_i2c, uint8_t addr7bit, INA219_GAIN_t value) {
     uint8_t buf[2] = { 0x00, (uint8_t)value };
@@ -14,6 +23,24 @@ halif_status_t INA219_SetBusRange(
     return halif_i2c_write(h_i2c, addr7bit, buf, 2, 100);
 }
 
+halif_status_t INA219_SetShuntMilliohm(
+    halif_handle_t   h_i2c,
+    uint8_t          addr7bit,
+    INA219_SHUNT_MILLIOHM_t value
+) {
+    (void)h_i2c; (void)addr7bit; (void)value;  // no register behind this field
+    return HALIF_OK;
+}
+
+halif_status_t INA219_SetCurrentLsbUa(
+    halif_handle_t   h_i2c,
+    uint8_t          addr7bit,
+    INA219_CURRENT_LSB_UA_t value
+) {
+    (void)h_i2c; (void)addr7bit; (void)value;  // no register behind this field
+    return HALIF_OK;
+}
+
 halif_status_t INA219_SetCalibration(
     halif_handle_t   h_i2c, uint8_t addr7bit, INA219_CALIBRATION_t value) {
     uint8_t buf[3] = {
@@ -22,15 +49,6 @@ halif_status_t INA219_SetCalibration(
         (uint8_t)(value & 0xFF)
     };
     return halif_i2c_write(h_i2c, addr7bit, buf, 3, 100);
-}
-
-halif_status_t INA219_SetPeriod(
-    halif_handle_t   h_i2c,
-    uint8_t          addr7bit,
-    INA219_PERIOD_t value
-) {
-    (void)h_i2c; (void)addr7bit; (void)value;
-    return HALIF_OK;  // Period is handled internally
 }
 
 halif_status_t INA219_ReadGain(

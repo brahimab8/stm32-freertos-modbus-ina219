@@ -11,8 +11,11 @@ typedef enum {
     INA219_GAIN_320MV = 3,
 } INA219_GAIN_t;
 typedef uint8_t INA219_BUS_RANGE_t;
+typedef uint8_t INA219_SHUNT_MILLIOHM_t;
+typedef uint8_t INA219_CURRENT_LSB_UA_t;
 typedef uint16_t INA219_CALIBRATION_t;
-typedef uint8_t INA219_ALL_t[4];
+typedef uint8_t INA219_ALL_t[8];
+
 #define REG_GAIN                 0x00
 #define REG_BUS_RANGE            0x00
 #define REG_CALIBRATION          0x05
@@ -27,6 +30,15 @@ typedef uint8_t INA219_ALL_t[4];
 #define BIT_SHUNT_VOLTAGE_UV       (1 << 1)
 #define BIT_CURRENT_UA             (1 << 2)
 #define BIT_POWER_MW               (1 << 3)
+
+/**
+ * @brief (no-op) software-only setter for period.
+ */
+halif_status_t INA219_SetPeriod(
+    halif_handle_t      h_i2c,
+    uint8_t             addr7bit,
+    INA219_PERIOD_t           value
+);
 
 /**
  * @brief Write to register 0x00 (set gain).
@@ -65,6 +77,24 @@ halif_status_t INA219_ReadBusRange(
 );
 
 /**
+ * @brief (no-op) software-only setter for shunt_milliohm.
+ */
+halif_status_t INA219_SetShuntMilliohm(
+    halif_handle_t      h_i2c,
+    uint8_t             addr7bit,
+    INA219_SHUNT_MILLIOHM_t           value
+);
+
+/**
+ * @brief (no-op) software-only setter for current_lsb_uA.
+ */
+halif_status_t INA219_SetCurrentLsbUa(
+    halif_handle_t      h_i2c,
+    uint8_t             addr7bit,
+    INA219_CURRENT_LSB_UA_t           value
+);
+
+/**
  * @brief Write to register 0x05 (set calibration).
  */
 halif_status_t INA219_SetCalibration(
@@ -80,15 +110,6 @@ halif_status_t INA219_ReadCalibration(
     halif_handle_t      h_i2c,
     uint8_t             addr7bit,
     uint16_t       *out
-);
-
-/**
- * @brief Set period (handled internally; no register).
- */
-halif_status_t INA219_SetPeriod(
-    halif_handle_t      h_i2c,
-    uint8_t             addr7bit,
-    INA219_PERIOD_t           value
 );
 
 // Reads bus_voltage_mV from register 0x02

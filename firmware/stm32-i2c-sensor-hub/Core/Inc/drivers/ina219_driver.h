@@ -28,6 +28,8 @@ typedef struct {
     INA219_PERIOD_t period;
     INA219_GAIN_t gain;
     INA219_BUS_RANGE_t bus_range;
+    INA219_SHUNT_MILLIOHM_t shunt_milliohm;
+    INA219_CURRENT_LSB_UA_t current_lsb_uA;
     INA219_CALIBRATION_t calibration;
     uint8_t payload_mask;   /**< which payload bits are enabled */
 } INA219_Ctx_t;
