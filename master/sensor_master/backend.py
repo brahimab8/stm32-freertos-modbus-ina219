@@ -2,7 +2,6 @@ from enum import Enum, auto
 import threading
 from .boards import BoardManager
 from .scheduler import StreamScheduler
-from .sensors import registry
 from .protocol import protocol
 
 
@@ -54,33 +53,15 @@ class SensorBackend:
         return discovery_info
 
     def _get_sensor_config(self, bound, board, addr, name):
-        md = registry.metadata(name)
         key = (board, addr, name)
 
         if key not in self.config_cache:
-            self.config_cache[key] = {}
+            try:
+                self.config_cache[key] = bound.get_all_config_fields(addr, name)
+            except Exception:
+                self.config_cache[key] = {}
 
-        cfg = {}
-        for fld in md.get('config_fields', []):
-            field_name = fld['name']
-            if field_name in self.config_cache[key]:
-                cfg[field_name] = self.config_cache[key][field_name]
-                continue
-
-            cmd_name = fld['getter_cmd']
-            cmd = protocol.commands.get(cmd_name)
-
-            if cmd is None:
-                continue
-
-            _, _, _, status, payload = bound._sm._execute(board, addr, cmd, 0)
-
-            if status == protocol.status_codes['STATUS_OK']:
-                value = int.from_bytes(payload, fld.get('endian') or 'little')
-                cfg[field_name] = value
-                self.config_cache[key][field_name] = value
-
-        return cfg
+        return self.config_cache[key]
 
     def start_stream(self, callback):
         with self.lock:
@@ -109,18 +90,9 @@ class SensorBackend:
 
     # Generic setter
     def set_config(self, board, addr, sensor, field, value):
-        md = registry.metadata(sensor)
-        fld = next((f for f in md['config_fields'] if f['name'] == field), None)
-
-        if fld is None or fld['setter_cmd'] is None:
-            raise ValueError(f"No setter for {field}")
-
-        cmd = protocol.commands[fld['setter_cmd']]
-        _, _, _, status, _ = self.board_mgr.select(board)._sm._execute(board, addr, cmd, value)
-
+        status = self.board_mgr.select(board).set_config_field(addr, sensor, field, value)
         if status == protocol.status_codes['STATUS_OK']:
             self.config_cache.setdefault((board, addr, sensor), {})[field] = value
-
         return status
 
     # Generic getter
@@ -129,25 +101,12 @@ class SensorBackend:
         if key in self.config_cache and field in self.config_cache[key]:
             return self.config_cache[key][field]
 
-        md = registry.metadata(sensor)
-        fld = next((f for f in md['config_fields'] if f['name'] == field), None)
-
-        if fld is None:
-            raise ValueError(f"No getter for {field}")
-
-        cmd = protocol.commands[fld['getter_cmd']]
-        _, _, _, status, payload = self.board_mgr.select(board)._sm._execute(board, addr, cmd, 0)
-
-        if status == protocol.status_codes['STATUS_OK']:
-            value = int.from_bytes(payload, fld.get('endian') or 'little')
-            self.config_cache.setdefault(key, {})[field] = value
-            return value
-
-        raise RuntimeError(f"Failed to get {field}")
+        value = self.board_mgr.select(board).get_config_field(addr, sensor, field)
+        self.config_cache.setdefault(key, {})[field] = value
+        return value
 
     def get_all_configs(self, board, addr, sensor):
-        md = registry.metadata(sensor)
-        return {fld['name']: self.get_config_field(board, addr, sensor, fld['name']) for fld in md['config_fields']}
+        return self.board_mgr.select(board).get_all_config_fields(addr, sensor)
 
     def get_payload_mask(self, board, addr):
         key = (board, addr)

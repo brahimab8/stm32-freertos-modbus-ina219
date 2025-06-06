@@ -15,6 +15,10 @@ class DummyBound:
 
     def list_sensors(self):
         return self._sensors
+    
+    def get_all_config_fields(self, addr, name):
+        # Simulate config lookup
+        return self._configs.get((addr, name), {})
 
 
 class DummyStreamScheduler:
@@ -63,60 +67,30 @@ def patch_dependencies(monkeypatch):
     yield
 
 
-def test_get_sensor_config_defaults(monkeypatch):
-    sb = SensorBackend(port="COMX", baud=123, timeout=0.1)
-    # Create metadata with no 'config_fields'
-    meta = {
-        'payload_fields': [],
-        'default_period_ms': 500,
-        'default_gain': 2,
-        'default_range': 7,
-        'default_calib': 10
-    }
-    monkeypatch.setattr(
-        backend_mod.registry, "metadata",
-        lambda name: meta
-    )
-    # Since there are no config_fields, _get_sensor_config should return {}
-    cfg = sb._get_sensor_config(bound=None, board=0, addr=0x10, name="foo")
+def test_get_sensor_config_defaults():
+    sb = SensorBackend()
+    bound = DummyBound(configs={})  # no fields
+    cfg = sb._get_sensor_config(bound=bound, board=0, addr=0x10, name="foo")
     assert cfg == {}
 
 
-def test_get_sensor_config_with_fields(monkeypatch):
-    sb = SensorBackend(port="COMY", baud=456, timeout=0.2)
-    # Metadata with config_fields that reference getters
-    meta = {
-        'payload_fields': [],
-        'config_fields': [
-            {'name': 'period_ms', 'getter_cmd': 'CMD_GET_PERIOD'},
-            {'name': 'gain',      'getter_cmd': 'CMD_GET_GAIN'},
-            {'name': 'range',     'getter_cmd': 'CMD_GET_RANGE'},
-            {'name': 'calib',     'getter_cmd': 'CMD_GET_CAL'},
-            # additional field that we won't actually use
-            {'name': 'unused',    'getter_cmd': 'CMD_GET_UNUSED'}
-        ]
+def test_get_sensor_config_with_fields():
+    sb = SensorBackend()
+    config = {
+        'period_ms': 1000,
+        'gain': 5,
+        'range': 8,
+        'calib': 12,
+        'unused': 999
     }
-    monkeypatch.setattr(backend_mod.registry, "metadata", lambda name: meta)
 
-    # Prepare a DummyBound that provides a fake _sm._execute
-    cfg_dict = {'period_ms': 1000, 'gain': 5, 'range': 8, 'calib': 12}
-    # Map command names to the corresponding values
-    cmd_map = {
-        'CMD_GET_PERIOD': cfg_dict['period_ms'],
-        'CMD_GET_GAIN':   cfg_dict['gain'],
-        'CMD_GET_RANGE':  cfg_dict['range'],
-        'CMD_GET_CAL':    cfg_dict['calib'],
-        'CMD_GET_UNUSED': 999
-    }
-    # Ensure protocol.commands and status_codes are set
-    monkeypatch.setattr(backend_mod.protocol, "commands", {
-        'CMD_GET_PERIOD': 'CMD_GET_PERIOD',
-        'CMD_GET_GAIN':   'CMD_GET_GAIN',
-        'CMD_GET_RANGE':  'CMD_GET_RANGE',
-        'CMD_GET_CAL':    'CMD_GET_CAL',
-        'CMD_GET_UNUSED': 'CMD_GET_UNUSED'
-    })
-    monkeypatch.setattr(backend_mod.protocol, "status_codes", {'STATUS_OK': 0})
+    bound = DummyBound(
+        configs={ (0x20, "foo"): config }
+    )
+
+    cfg = sb._get_sensor_config(bound=bound, board=7, addr=0x20, name="foo")
+    assert cfg == config
+
 
     class DummySM:
         def _execute(self, board, addr, cmd, zero):
@@ -154,15 +128,6 @@ def test_do_discovery(monkeypatch):
     configs = { (0x10, None): {'period_ms': 200, 'gain':1, 'range':2, 'calib':3 }}
     bound = DummyBound(sensors=sensors, configs=configs)
     monkeypatch.setattr(sb.board_mgr, "select", lambda bid: bound)
-    # Stub registry.metadata to include no config_fields, so _get_sensor_config yields {}
-    meta = {
-        'payload_fields': [],
-        'default_period_ms': 200,
-        'default_gain': 1,
-        'default_range': 2,
-        'default_calib': 3
-    }
-    monkeypatch.setattr(backend_mod.registry, "metadata", lambda name: meta)
 
     result = sb._do_discovery()
     # Expect one board entry mapping to a list with one sensor dict

@@ -1,6 +1,7 @@
 import pytest
 from sensor_master.boards import BoardManager
 from sensor_master.protocol import protocol
+from sensor_master.sensors import registry
 
 
 class FakeSM:
@@ -60,7 +61,9 @@ class FakeSM:
         return self._execute(board_id, addr, protocol.commands['CMD_REMOVE_SENSOR'], 0)
 
     def list_sensors(self, board_id):
-        return self._execute(board_id, 0x00, protocol.commands['CMD_LIST_SENSORS'], 0)
+        self._execute(board_id, 0x00, protocol.commands['CMD_LIST_SENSORS'], 0)
+        # mimic real return: list of (name, addr)
+        return [("dummy_sensor", "0x10"), ("dummy_sensor", "0x11")]
 
     def set_period(self, board_id, addr, ms):
         return self._execute(board_id, addr, protocol.commands['CMD_SET_PERIOD'], ms)
@@ -96,6 +99,28 @@ class FakeSM:
     def get_payload_mask(self, board_id, addr):
         return self._execute(board_id, addr, protocol.commands['CMD_GET_PAYLOAD_MASK'], 0)
 
+@pytest.fixture(autouse=True)
+def fake_registry(monkeypatch):
+    def mock_metadata(sensor_name):
+        return {
+            'config_fields': [
+                {
+                    'name': 'period',
+                    'setter_cmd': 'CMD_SET_PERIOD',
+                    'getter_cmd': 'CMD_GET_PERIOD',
+                    'size': 1,
+                    'endian': 'little',
+                },
+                {
+                    'name': 'gain',
+                    'setter_cmd': 'CMD_SET_GAIN',
+                    'getter_cmd': 'CMD_GET_GAIN',
+                    'size': 1,
+                    'endian': 'little',
+                }
+            ]
+        }
+    monkeypatch.setattr(registry, "metadata", mock_metadata)
 
 @pytest.fixture(autouse=True)
 def patch_sm(monkeypatch):
@@ -162,13 +187,11 @@ def test_boundmaster_forwards_all_methods():
     bm.add_sensor(0x10, 'foo')
     bm.read_samples(0x11, 'bar')
     bm.remove_sensor(0x12)
-    bm.set_config(0x13, 'CMD_SET_PERIOD', 500)
-    bm.set_config(0x14, 'CMD_SET_GAIN', 3)
-    bm.set_config(0x15, 'CMD_SET_RANGE', 7)
-    bm.set_config(0x16, 'CMD_SET_CAL', 42)
+    bm.set_config_field(0x13, 'dummy_sensor', 'period', 500)
+    bm.set_config_field(0x14, 'dummy_sensor', 'gain', 3)
 
-    # We should have exactly 7 calls in FakeSM.calls
-    assert len(fake.calls) == 7
+    # We should have exactly 5 calls in FakeSM.calls
+    assert len(fake.calls) == 5
     # Every call's first element must be the bound board_id=8
     assert all(call[0] == 8 for call in fake.calls)
     # Collect the set of forwarded command IDs
@@ -179,8 +202,6 @@ def test_boundmaster_forwards_all_methods():
         protocol.commands['CMD_REMOVE_SENSOR'],
         protocol.commands['CMD_SET_PERIOD'],
         protocol.commands['CMD_SET_GAIN'],
-        protocol.commands['CMD_SET_RANGE'],
-        protocol.commands['CMD_SET_CAL'],
     }
     assert seen_cmds == expected
 
@@ -191,16 +212,13 @@ def test_boundmaster_forwards_new_getters_and_payload_mask_methods():
     bm = mgr.select(8)
 
     # Invoke each of the newly‐added methods on _BoundMaster:
-    bm.get_config(0x20, 'CMD_GET_PERIOD')
-    bm.get_config(0x21, 'CMD_GET_GAIN')
-    bm.get_config(0x22, 'CMD_GET_RANGE')
-    bm.get_config(0x23, 'CMD_GET_CAL')
-    bm.get_config(0x24, 'CMD_GET_CONFIG')
+    bm.get_config_field(0x20, 'dummy_sensor', 'period')
+    bm.get_config_field(0x21, 'dummy_sensor', 'gain')
     bm.set_payload_mask(0x25, 0x0F)
     bm.get_payload_mask(0x26)
 
-    # That should be 7 new calls
-    assert len(fake.calls) == 7
+    # That should be 4 new calls
+    assert len(fake.calls) == 4
     # Every call uses board_id = 8
     assert all(call[0] == 8 for call in fake.calls)
 
@@ -208,9 +226,6 @@ def test_boundmaster_forwards_new_getters_and_payload_mask_methods():
     expected_commands = {
         protocol.commands['CMD_GET_PERIOD'],
         protocol.commands['CMD_GET_GAIN'],
-        protocol.commands['CMD_GET_RANGE'],
-        protocol.commands['CMD_GET_CAL'],
-        protocol.commands['CMD_GET_CONFIG'],
         protocol.commands['CMD_SET_PAYLOAD_MASK'],
         protocol.commands['CMD_GET_PAYLOAD_MASK'],
     }
@@ -223,6 +238,27 @@ def test_boardmanager_list_sensors_forwards():
 
     # simulate a successful list_sensors call
     result = mgr.list_sensors(6)
-    # FakeSM.list_sensors returns a 5‐tuple (None, None, None, status, b'')
-    assert result == (None, None, None, protocol.status_codes['STATUS_OK'], b'')
+
+    # FakeSM.list_sensors returns: 
+    # [("sensor_name", "string(hex_address_1)"), ("sensor_name", "string(hex_address_2)")]
+    assert result == [("dummy_sensor", "0x10"), ("dummy_sensor", "0x11")]
     assert fake.calls[-1] == (6, 0x00, protocol.commands['CMD_LIST_SENSORS'], 0)
+
+def test_boundmaster_config_field_accessors():
+    mgr = BoardManager(port="X", baud=1, timeout=1)
+    fake = mgr._sm
+    bm = mgr.select(6)
+
+    # Test setting config field
+    status = bm.set_config_field(0x10, 'dummy_sensor', 'period', 42)
+    assert status == protocol.status_codes['STATUS_OK']
+    assert fake.calls[-1][2] == protocol.commands['CMD_SET_PERIOD']
+
+    # Test getting config field
+    val = bm.get_config_field(0x10, 'dummy_sensor', 'gain')
+    assert isinstance(val, int)
+    assert fake.calls[-1][2] == protocol.commands['CMD_GET_GAIN']
+
+    # Test getting all configs
+    all_cfgs = bm.get_all_config_fields(0x10, 'dummy_sensor')
+    assert 'period' in all_cfgs and 'gain' in all_cfgs

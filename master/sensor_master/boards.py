@@ -1,5 +1,6 @@
 from .core import SensorMaster
 from .protocol import protocol
+from .sensors import registry
 
 class BoardManager:
     def __init__(self, port: str = 'COM3', baud: int = 115200, timeout: float = 0.05):
@@ -68,13 +69,44 @@ class _BoundMaster:
     def get_payload_mask(self, addr: int) -> int:
         return self._sm.get_payload_mask(self._bid, addr)
 
-    def set_config(self, addr: int, cmd_name: str, param: int):
-        status, _ = self.execute_cmd(addr, cmd_name, param)
+    def set_config_field(self, addr: int, sensor: str, field: str, value: int) -> int:
+        md = registry.metadata(sensor)
+        fld = next((f for f in md['config_fields'] if f['name'] == field), None)
+
+        if fld is None or fld['setter_cmd'] is None:
+            raise ValueError(f"No setter for field '{field}' in sensor '{sensor}'")
+
+        if fld.get('size', 1) > 1:
+            raise NotImplementedError(
+                f"Cannot set field '{field}' (size={fld['size']}) in one byte. "
+                "Use a specialized setter or calibration logic."
+            )
+
+        cmd = protocol.commands[fld['setter_cmd']]
+        _, _, _, status, _ = self._sm._execute(self._bid, addr, cmd, value)
         return status
 
-    def get_config(self, addr: int, cmd_name: str):
-        status, payload = self.execute_cmd(addr, cmd_name)
-        return payload if status == protocol.status_codes['STATUS_OK'] else None
+    def get_config_field(self, addr: int, sensor: str, field: str) -> int:
+        md = registry.metadata(sensor)
+        fld = next((f for f in md['config_fields'] if f['name'] == field), None)
+
+        if fld is None or fld['getter_cmd'] is None:
+            raise ValueError(f"No getter for field '{field}' in sensor '{sensor}'")
+
+        cmd = protocol.commands[fld['getter_cmd']]
+        _, _, _, status, payload = self._sm._execute(self._bid, addr, cmd, 0)
+
+        if status != protocol.status_codes['STATUS_OK']:
+            raise RuntimeError(f"Failed to get field '{field}': status={status}")
+
+        return int.from_bytes(payload, fld.get('endian') or 'little')
+
+    def get_all_config_fields(self, addr: int, sensor: str) -> dict:
+        md = registry.metadata(sensor)
+        return {
+            fld['name']: self.get_config_field(addr, sensor, fld['name'])
+            for fld in md.get('config_fields', [])
+        }
 
     def execute_cmd(self, addr: int, cmd_name: str, param: int = 0):
         """
