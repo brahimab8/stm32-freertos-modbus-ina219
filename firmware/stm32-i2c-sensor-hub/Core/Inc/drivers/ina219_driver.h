@@ -11,7 +11,9 @@
 // ---------------- Public callbacks ----------------
 void ina219_init_ctx(void *vctx, halif_handle_t h_i2c, uint8_t addr7);
 bool ina219_configure(void *vctx, uint8_t field_id, uint8_t value);
-bool ina219_read_config(void *vctx, uint8_t field_id, uint8_t *value);
+
+// Reader that returns N bytes for each GET_… command:
+bool ina219_read_config_bytes(void *vctx, uint8_t field_id, uint8_t *out_buf, size_t *out_len);
 
 // vtable getter:
 const SensorDriver_t *INA219_GetDriver(void);

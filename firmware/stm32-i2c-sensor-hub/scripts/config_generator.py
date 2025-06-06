@@ -90,6 +90,9 @@ def build_config_source_lines(name: str, meta: dict) -> list[str]:
     lines.append(f"{struct} {SC}_defaults = {{")
 
     for cf in meta.get("config_fields", []):
+        if cf.get("setter_cmd") is None:
+            # skip any field that has no setter (e.g. “calibration”)
+            continue
         fld_name = cf["name"]
         defaults = meta.get("config_defaults", {})
         if fld_name not in defaults:

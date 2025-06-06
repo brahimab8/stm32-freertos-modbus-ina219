@@ -75,35 +75,46 @@ static halif_status_t rd(void *ctx, uint8_t out_buf[], uint8_t *out_len) {
     return HALIF_OK;
 }
 
-bool ina219_read_config(void *vctx, uint8_t field, uint8_t *out) {
+bool ina219_read_config_bytes(void *vctx, uint8_t field, uint8_t *out_buf, size_t *out_len) {
     INA219_Ctx_t *c = (INA219_Ctx_t *)vctx;
     switch (field) {
       case CMD_GET_PERIOD:
-        *out = (uint8_t)c->period;
+        out_buf[0] = (uint8_t)c->period;
+        *out_len = 1;
         return true;
 
       case CMD_GET_GAIN:
-        *out = (uint8_t)c->gain;
+        out_buf[0] = (uint8_t)c->gain;
+        *out_len = 1;
         return true;
 
       case CMD_GET_RANGE:
-        *out = (uint8_t)c->bus_range;
+        out_buf[0] = (uint8_t)c->bus_range;
+        *out_len = 1;
         return true;
 
       case CMD_GET_SHUNT:
-        *out = (uint8_t)c->shunt_milliohm;
+        out_buf[0] = (uint8_t)c->shunt_milliohm;
+        *out_len = 1;
         return true;
 
       case CMD_GET_CURRENT_LSB:
-        *out = (uint8_t)c->current_lsb_uA;
+        out_buf[0] = (uint8_t)c->current_lsb_uA;
+        *out_len = 1;
         return true;
 
       case CMD_GET_CAL:
-        *out = (uint8_t)(c->calibration & 0xFF);
-        return true;
+        // return 2 bytes (big-endian) for field `calibration`
+        {
+            out_buf[0] = (uint8_t)((c->calibration >> 8) & 0xFF);
+            out_buf[1] = (uint8_t)((c->calibration >> 0) & 0xFF);
+            *out_len = 2;
+            return true;
+        }
 
       case CMD_GET_PAYLOAD_MASK:
-        *out = c->payload_mask;
+        out_buf[0] = c->payload_mask;
+        *out_len = 1;
         return true;
 
       default:
@@ -139,7 +150,7 @@ static const SensorDriver_t ina219_driver = {
     .init        = (HAL_StatusTypeDef (*)(void *)) ini,
     .read        = (HAL_StatusTypeDef (*)(void *, uint8_t *, uint8_t *)) rd,
     .sample_size = get_sample_size,
-    .read_config = ina219_read_config,
+    .read_config_bytes = ina219_read_config_bytes,
 };
 
 const SensorDriver_t *INA219_GetDriver(void) {
@@ -156,7 +167,7 @@ static const SensorDriverInfo_t ina219_info = {
     .init_ctx             = ina219_init_ctx,
     .get_driver           = INA219_GetDriver,
     .configure            = ina219_configure,
-    .read_config          = ina219_read_config,
+    .read_config_bytes    = ina219_read_config_bytes,
     .get_config_fields    = ina219_get_config_fields,
     .get_default_period_ms = ina219_default_period_ms,  // 5 * 100ms
 };

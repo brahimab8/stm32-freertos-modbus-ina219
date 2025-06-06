@@ -61,7 +61,9 @@ def build_driver_header_lines(name: str, meta: dict) -> list[str]:
         "// ---------------- Public callbacks ----------------",
         f"void {SC}_init_ctx(void *vctx, halif_handle_t h_i2c, uint8_t addr7);",
         f"bool {SC}_configure(void *vctx, uint8_t field_id, uint8_t value);",
-        f"bool {SC}_read_config(void *vctx, uint8_t field_id, uint8_t *value);",
+        "",
+        "// Reader that returns N bytes for each GET_… command:",
+        f"bool {SC}_read_config_bytes(void *vctx, uint8_t field_id, uint8_t *out_buf, size_t *out_len);",
         "",
         "// vtable getter:",
         f"const SensorDriver_t *{UPPER}_GetDriver(void);",
@@ -101,10 +103,7 @@ def build_driver_header_lines(name: str, meta: dict) -> list[str]:
 
 def build_driver_source_lines(name: str, meta: dict) -> list[str]:
     """
-    Build lines for the driver-layer implementation:Src/drivers/<sensor>_driver.c
-
-    - Fields with "computed": true (and a "formula" + "depends_on" list)
-      get automatically recalculated whenever any dependency setter is called.
+    Build lines for the driver-layer implementation: Src/drivers/<sensor>_driver.c
     """
     SC = snake_case(name)
     UPPER = name.upper()
@@ -184,6 +183,7 @@ def build_driver_source_lines(name: str, meta: dict) -> list[str]:
                 "        total_bytes += 4;"
             ])
         else:
+            # General N-byte case
             for b in range(size):
                 shift_amt = 8 * (size - 1 - b)
                 lines.append(f"        *cursor++ = (uint8_t)(({tmp_name} >> {shift_amt}) & 0xFF);")
@@ -198,8 +198,8 @@ def build_driver_source_lines(name: str, meta: dict) -> list[str]:
         ""
     ])
 
-    # 4c) read_config(): return a single byte for each getter + mask getter
-    lines.append(f"bool {SC}_read_config(void *vctx, uint8_t field, uint8_t *out) {{")
+    # 4c) Multi-byte read_config_bytes()
+    lines.append(f"bool {SC}_read_config_bytes(void *vctx, uint8_t field, uint8_t *out_buf, size_t *out_len) {{")
     lines.append(f"    {ctx_struct} *c = ({ctx_struct} *)vctx;")
     lines.append("    switch (field) {")
     for cf in meta.get("config_fields", []):
@@ -210,18 +210,29 @@ def build_driver_source_lines(name: str, meta: dict) -> list[str]:
             continue
         lines.append(f"      case {getter}:")
         if size == 1:
-            lines.append(f"        *out = (uint8_t)c->{fld_name};")
+            lines.append(f"        out_buf[0] = (uint8_t)c->{fld_name};")
+            lines.append("        *out_len = 1;")
+            lines.append("        return true;")
+            lines.append("")
         else:
-            lines.append(f"        *out = (uint8_t)(c->{fld_name} & 0xFF);")
-        lines.extend([
-            "        return true;",
-            ""
-        ])
-
-    # 4c2) payload-mask getter
+            # Emit N-byte big-endian splitting
+            lines.append(f"        // return {size} bytes (big-endian) for field `{fld_name}`")
+            lines.append("        {")
+            for i in range(size):
+                shift_amt = 8 * (size - 1 - i)
+                lines.append(
+                    f"            out_buf[{i}] = "
+                    f"(uint8_t)((c->{fld_name} >> {shift_amt}) & 0xFF);"
+                )
+            lines.append(f"            *out_len = {size};")
+            lines.append("            return true;")
+            lines.append("        }")
+            lines.append("")
+    # 4c2) payload-mask (always 1 byte)
     lines.extend([
         "      case CMD_GET_PAYLOAD_MASK:",
-        "        *out = c->payload_mask;",
+        "        out_buf[0] = c->payload_mask;",
+        "        *out_len = 1;",
         "        return true;",
         ""
     ])
@@ -234,11 +245,13 @@ def build_driver_source_lines(name: str, meta: dict) -> list[str]:
         ""
     ])
 
-    # 4c3) List of supported config field IDs
+    # 4d) List of supported config field IDs (for get_config_fields())
     field_ids = [
         cf["getter_cmd"]
         for cf in meta.get("config_fields", [])
-        if cf.get("getter_cmd") is not None and cf["name"] != "all"
+        if cf.get("getter_cmd") is not None
+           and cf.get("setter_cmd") is not None
+           and cf["name"] != "all"
     ]
     if field_ids:
         lines.append(f"static const uint8_t {SC}_config_fields[] = {{")
@@ -254,16 +267,16 @@ def build_driver_source_lines(name: str, meta: dict) -> list[str]:
             ""
         ])
 
-    # 4d) get_sample_size() helper
+    # 4e) get_sample_size() helper
     lines.extend(emit_get_sample_size(meta, ctx_struct))
 
-    # 4e) vtable + GetDriver()
+    # 4f) vtable + GetDriver()
     lines.extend([
         f"static const SensorDriver_t {vtable_name} = {{",
         f"    .init        = (HAL_StatusTypeDef (*)(void *)) ini,",
         f"    .read        = (HAL_StatusTypeDef (*)(void *, uint8_t *, uint8_t *)) rd,",
         f"    .sample_size = get_sample_size,",
-        f"    .read_config = {SC}_read_config,",
+        f"    .read_config_bytes = {SC}_read_config_bytes,",
         "};",
         "",
         f"const SensorDriver_t *{UPPER}_GetDriver(void) {{",
@@ -272,16 +285,16 @@ def build_driver_source_lines(name: str, meta: dict) -> list[str]:
         ""
     ])
 
-    # 4e2) default_period helper
+    # 4g) default_period helper
     default_period = meta.get("config_defaults", {}).get("period", 10)
     lines.extend([
         f"static uint32_t {SC}_default_period_ms(void) {{",
-        f"    return {default_period} * 100;",
+        f"    return {default_period} * 100;",  # convert “units of 100ms” to ms
         "}",
         ""
     ])
 
-    # 4f) SensorDriverInfo_t + RegisterDriver()
+    # 4h) SensorDriverInfo_t + RegisterDriver()
     lines.extend([
         f"static const SensorDriverInfo_t {SC}_info = {{",
         f"    .type_code            = SENSOR_TYPE_{UPPER},",
@@ -289,7 +302,7 @@ def build_driver_source_lines(name: str, meta: dict) -> list[str]:
         f"    .init_ctx             = {SC}_init_ctx,",
         f"    .get_driver           = {UPPER}_GetDriver,",
         f"    .configure            = {SC}_configure,",
-        f"    .read_config          = {SC}_read_config,",
+        f"    .read_config_bytes    = {SC}_read_config_bytes,",
         f"    .get_config_fields    = {'NULL' if not field_ids else f'{SC}_get_config_fields'},",
         f"    .get_default_period_ms = {SC}_default_period_ms,  // {default_period} * 100ms",
         "};",
@@ -300,7 +313,7 @@ def build_driver_source_lines(name: str, meta: dict) -> list[str]:
         ""
     ])
 
-    # 4g) init_ctx() and configure()
+    # 4i) init_ctx() and configure()
     lines.extend([
         f"void {SC}_init_ctx(void *vctx, halif_handle_t h_i2c, uint8_t addr7) {{",
         f"    {ctx_struct} *c = ({ctx_struct} *)vctx;",
@@ -319,7 +332,7 @@ def build_driver_source_lines(name: str, meta: dict) -> list[str]:
                 "formula":    cf.get("formula", "").strip()
             }
 
-    # 4g2) configure() switch, injecting computed logic
+    # 4j) configure() switch, injecting computed logic
     lines.append(f"bool {SC}_configure(void *vctx, uint8_t field_id, uint8_t param) {{")
     lines.append(f"    {ctx_struct} *c = ({ctx_struct} *)vctx;")
     lines.append("    halif_status_t rc;")
@@ -330,7 +343,6 @@ def build_driver_source_lines(name: str, meta: dict) -> list[str]:
         setter_cmd = cf.get("setter_cmd")
         is_computed = cf.get("computed", False)
 
-        # Skip any field with no setter_cmd or itself computed
         if not setter_cmd or is_computed:
             continue
         pascal = "".join(w.capitalize() for w in fld_name.split("_"))
@@ -353,6 +365,7 @@ def build_driver_source_lines(name: str, meta: dict) -> list[str]:
                 lines.append(f"            {UPPER}_Set{comp_pascal}(c->h_i2c, c->addr7, c->{comp_name});")
                 lines.append("")
 
+
         lines.extend([
             "            return true;",
             "        } else {",
@@ -361,16 +374,34 @@ def build_driver_source_lines(name: str, meta: dict) -> list[str]:
             ""
         ])
 
-    # 4g3) payload-mask setter + default
+    # (b) No‐op “SET” for any getter‐only field except “all”
+    for cf in meta.get("config_fields", []):
+        getter_cmd = cf.get("getter_cmd")
+        setter_cmd = cf.get("setter_cmd")
+        name       = cf.get("name")
+
+        if getter_cmd is None or setter_cmd is not None or name == "all":
+            continue
+
+        # getter_cmd is in [CMD_CONFIG_GETTERS_START..CMD_CONFIG_GETTERS_END],
+        # so subtracting (30−20)=10 yields the matching SET code in [20..29].
+        lines.append(f"      case {getter_cmd} - (CMD_CONFIG_GETTERS_START - CMD_CONFIG_SETTERS_START):")
+        lines.append("        // no-op for a read-only (getter-only) field (e.g. calibration)")
+        lines.append("        return true;")
+        lines.append("")
+
+    # (c) payload-mask setter + default
     lines.extend([
         "      case CMD_SET_PAYLOAD_MASK:",
         "        c->payload_mask = param;",
         "        return true;",
         "",
+        # (d) fallback default
         "      default:",
         "        return false;",
         "    }",
-        "}"
+        "}",
+        ""
     ])
 
     return lines
