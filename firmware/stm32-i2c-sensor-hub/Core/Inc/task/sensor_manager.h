@@ -3,7 +3,7 @@
 
 #include "cmsis_os.h"
 #include "task/sensor_task.h"    ///< for SensorTaskHandle_t, SensorSample_t
-#include "driver_registry.h" 
+#include "driver_registry.h"
 
 #include <stdint.h>
 
@@ -80,17 +80,23 @@ SM_Status_t SensorManager_Configure(SensorManager_t *mgr,
                                     uint8_t          param);
 
 /**
- * @brief   Read back a configuration field from a running sensor.
+ * @brief   Read back a multi‐byte configuration field from a running sensor.
+ *
+ * New mode: driver may return N bytes (e.g. two‐byte calibration).  
+ * Writes up to *out_len bytes into out_buf and sets *out_len accordingly.
+ *
  * @param   mgr        Manager handle.
  * @param   addr7      7-bit I²C address of the sensor.
- * @param   field_id   Driver-local field ID.
- * @param   out_value  Pointer to a uint8_t to receive the value.
- * @return  SM_OK on success; SM_ERROR if not found.
+ * @param   field_id   Driver-local CMD_GET_… field ID.
+ * @param   out_buf    Pre‐allocated buffer to receive the bytes.
+ * @param   out_len    Pointer to size_t; on success, holds number of bytes written.
+ * @return  SM_OK on success; SM_ERROR if not found or driver error.
  */
-SM_Status_t SensorManager_GetConfig(SensorManager_t *mgr,
-                                    uint8_t          addr7,
-                                    uint8_t          field_id,
-                                    uint8_t         *out_value);
+SM_Status_t SensorManager_GetConfigBytes(SensorManager_t *mgr,
+                                         uint8_t          addr7,
+                                         uint8_t          field_id,
+                                         uint8_t         *out_buf,
+                                         size_t          *out_len);
 
 /**
  * @brief   Read up to `max_samples` from the sensor’s FIFO.

@@ -156,42 +156,6 @@ SM_Status_t SensorManager_Configure(SensorManager_t *mgr,
     return SM_ERROR;
 }
 
-SM_Status_t SensorManager_GetConfig(SensorManager_t *mgr,
-                                    uint8_t          addr7,
-                                    uint8_t          field_id,
-                                    uint8_t         *out_value)
-{
-    if (!mgr || !out_value) {
-        return SM_ERROR;
-    }
-
-    /* Special‐case: if the client asks for “GET_PERIOD”, return our stored period. */
-    if (field_id == CMD_GET_PERIOD) {
-        for (uint8_t i = 0; i < mgr->count; ++i) {
-            SM_Entry_t *e = &mgr->entries[i];
-            if (e->addr7 == addr7) {
-                *out_value = (uint8_t)(e->period_ms / 100);
-                return SM_OK;
-            }
-        }
-        return SM_ERROR;
-    }
-
-    /* Otherwise, delegate to the driver’s read_config(...) */
-    for (uint8_t i = 0; i < mgr->count; ++i) {
-        SM_Entry_t *e = &mgr->entries[i];
-        if (e->addr7 == addr7) {
-            const SensorDriverInfo_t *info = SensorRegistry_Find(e->type_code);
-            if (!info) {
-                return SM_ERROR;
-            }
-            bool ok = info->read_config(e->ctx, field_id, out_value);
-            return ok ? SM_OK : SM_ERROR;
-        }
-    }
-    return SM_ERROR;
-}
-
 SM_Status_t SensorManager_Read(SensorManager_t *mgr,
                                uint8_t          addr7,
                                SensorSample_t   out[],
@@ -269,4 +233,55 @@ const SensorDriverInfo_t *SensorRegistry_FindByAddr(SensorManager_t *mgr, uint8_
         }
     }
     return NULL;
+}
+
+/**
+ * @brief   Read a configuration field from the sensor, returning all bytes.
+ *          This replaces the old single‐byte `read_config`.
+ *
+ * @param   mgr       Manager handle.
+ * @param   addr7     7-bit I²C address.
+ * @param   field_id  One of CMD_GET_… from protocol.h.
+ * @param   out_buf   Buffer to receive up to 4 bytes (or as many as the driver returns).
+ * @param   out_len   Returns how many bytes were actually written.
+ * @return  SM_OK on success, SM_ERROR otherwise.
+ */
+SM_Status_t SensorManager_GetConfigBytes(SensorManager_t *mgr,
+                                         uint8_t          addr7,
+                                         uint8_t          field_id,
+                                         uint8_t         *out_buf,
+                                         size_t          *out_len)
+{
+    if (!mgr || !out_buf || !out_len) {
+        return SM_ERROR;
+    }
+
+    /* Special‐case: if the client asks for “GET_PERIOD”, it still only returns one byte. */
+    if (field_id == CMD_GET_PERIOD) {
+        for (uint8_t i = 0; i < mgr->count; ++i) {
+            SM_Entry_t *e = &mgr->entries[i];
+            if (e->addr7 == addr7) {
+                /* period_ms stored in milliseconds; divide by 100 to get the "units of 100ms" */
+                out_buf[0] = (uint8_t)(e->period_ms / 100);
+                *out_len   = 1;
+                return SM_OK;
+            }
+        }
+        return SM_ERROR;
+    }
+
+    /* Otherwise, delegate to the driver’s read_config_bytes(...) */
+    for (uint8_t i = 0; i < mgr->count; ++i) {
+        SM_Entry_t *e = &mgr->entries[i];
+        if (e->addr7 == addr7) {
+            const SensorDriverInfo_t *info = SensorRegistry_Find(e->type_code);
+            if (!info) {
+                return SM_ERROR;
+            }
+            bool ok = info->read_config_bytes(e->ctx, field_id, out_buf, out_len);
+            return ok ? SM_OK : SM_ERROR;
+        }
+    }
+
+    return SM_ERROR;
 }

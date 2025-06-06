@@ -40,15 +40,17 @@ typedef struct {
     uint8_t           (*sample_size)(void *ctx);
 
     /**
-     * @brief   Get the sensor config values.
-     * @param   ctx      Opaque driver context.
-     * @param   field_id   Driver-local field ID.
-     * @param   out_value  Pointer to a uint8_t to receive the value.
-     * @return  HAL_OK if read succeeded, HAL_ERROR otherwise.
+     * @brief Read one or more bytes for a given configuration field
+     * @param ctx       Pointer to that sensor's context struct
+     * @param field     The CMD_GET_… opcode
+     * @param out_buf   Buffer where to write up to N bytes
+     * @param out_len   Pointer to size_t where we write "how many bytes we returned"
+     * @return true if successful, false otherwise
      */
-    bool        (*read_config)(void *ctx,
-                            uint8_t field_id,
-                            uint8_t *out_value);
+    bool (*read_config_bytes)(void *ctx,
+                            uint8_t field,
+                            uint8_t *out_buf,
+                            size_t *out_len);
 
 
 } SensorDriver_t;

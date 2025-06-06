@@ -32,9 +32,9 @@ typedef struct {
 
     /** Configure a sensor field (period, gain, etc.) */
     bool (*configure)(void *ctx, uint8_t field_id, uint8_t value);
-
-    /** Read a sensor configuration field */
-    bool (*read_config)(void *ctx, uint8_t field_id, uint8_t *value);
+    
+    /*  Read a sensor configuration field of arbitrary length. */
+    bool (*read_config_bytes)(void *ctx, uint8_t field_id, uint8_t *out_buf, size_t *out_len);
 
     /** List of valid config field IDs */
     const uint8_t *(*get_config_fields)(size_t *count);
