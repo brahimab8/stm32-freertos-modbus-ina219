@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
+#include <stdint.h>
+#include <stddef.h>
 
 #include "utils/response_builder.h"
 #include "utils/checksum.h"
@@ -63,22 +65,24 @@ int main(void) {
         assert(buf[7] == chk);
     }
 
-    // ---------- 3) Test BuildGetConfig (4-byte payload) ----------
-    memset(buf, 0, sizeof(buf));
-    out_len = ResponseBuilder_BuildGetConfig(
+    // ---------- 3) Test BuildPayload for GetConfig (4-byte payload) ----------
+    // Compose a 4-byte payload: [period, gain, range, calib_lsb]
+    uint8_t config_vals[4] = { 0x12, 0x34, 0x56, 0x78 };
+    memset(buf, 0x00, sizeof(buf));
+    out_len = ResponseBuilder_BuildPayload(
         buf,
         /*addr7=*/0x56,
-        /*period=*/0x12,
-        /*gain=*/0x34,
-        /*range=*/0x56,
-        /*calib_lsb=*/0x78
+        /*cmd=*/CMD_GET_CONFIG,
+        /*values=*/config_vals,
+        /*count=*/4
     );
     // Header: [0]=SOF, [1]=BOARD_ID, [2]=0x56, [3]=CMD_GET_CONFIG, [4]=STATUS_OK, [5]=4
-    // Payload: [6]=0x12, [7]=0x34, [8]=0x56, [9]=0x78
-    // Checksum: at index 10
-    assert(out_len == RESPONSE_HEADER_LENGTH + 4 + CHECKSUM_LENGTH);
+    // Payload:  [6]=0x12, [7]=0x34, [8]=0x56, [9]=0x78
+    // Checksum at index 10
+    assert(out_len == (RESPONSE_HEADER_LENGTH + 4 + CHECKSUM_LENGTH));
     assert(buf[2] == 0x56);
     assert(buf[3] == CMD_GET_CONFIG);
+    assert(buf[4] == STATUS_OK);
     assert(buf[5] == 4);
     assert(buf[6] == 0x12);
     assert(buf[7] == 0x34);
@@ -104,9 +108,10 @@ int main(void) {
         entries,
         /*count=*/2
     );
-    // Header: [2]=0x12, [3]=CMD_LIST_SENSORS, [4]=STATUS_OK, [5]=payload_len=4
-    // Payload (4 bytes): [6]=0xA1,[7]=0x10,[8]=0xB2,[9]=0x20
-    // Checksum: at [10]
+    // Header: [0]=SOF, [1]=BOARD_ID, [2]=0x12, [3]=CMD_LIST_SENSORS, [4]=STATUS_OK, [5]=4
+    // Payload: [6]=0xA1, [7]=0x10, [8]=0xB2, [9]=0x20
+    // Checksum at [10]
+    assert(out_len == (RESPONSE_HEADER_LENGTH + (2 * 2) + CHECKSUM_LENGTH));
     assert(buf[5] == 4);
     assert(buf[6] == 0xA1);
     assert(buf[7] == 0x10);
@@ -119,7 +124,7 @@ int main(void) {
 
     // ---------- 5) Test BuildSamples (1 sample with 3 data bytes) ----------
     SensorSample_t sample;
-    sample.tick = 0x11223344;     // arbitrary
+    sample.tick = 0x11223344;  // arbitrary 32-bit tick
     sample.len  = 3;
     sample.buf[0] = 0x01;
     sample.buf[1] = 0x02;
@@ -133,10 +138,11 @@ int main(void) {
         /*count=*/1,
         /*sample_size=*/SENSOR_MAX_PAYLOAD
     );
-    // Header: [2]=0x12, [3]=CMD_READ_SAMPLES, [4]=STATUS_OK, [5]=payload_len=7 (4 tick + 3 data)
-    // Tick (big-endian): [6]=0x11,[7]=0x22,[8]=0x33,[9]=0x44
-    // Data: [10]=0x01,[11]=0x02,[12]=0x03
-    // Checksum: at [13]
+    // Header: [0]=SOF, [1]=BOARD_ID, [2]=0x12, [3]=CMD_READ_SAMPLES, [4]=STATUS_OK, [5]=7
+    // Tick (big-endian): [6]=0x11, [7]=0x22, [8]=0x33, [9]=0x44
+    // Data: [10]=0x01, [11]=0x02, [12]=0x03
+    // Checksum: [13]
+    assert(out_len == (RESPONSE_HEADER_LENGTH + (4 + 3) + CHECKSUM_LENGTH));
     assert(buf[5] == 7);
     assert(buf[6] == 0x11);
     assert(buf[7] == 0x22);
@@ -150,18 +156,23 @@ int main(void) {
         assert(buf[13] == chk);
     }
 
-    // ---------- 6) Test BuildConfigValues (3 values) ----------
-    uint8_t vals[3] = { 0xAA, 0xBB, 0xCC };
+    // ---------- 6) Test BuildPayload for arbitrary 3-byte values ----------
+    uint8_t arbitrary_vals[3] = { 0xAA, 0xBB, 0xCC };
     memset(buf, 0, sizeof(buf));
-    out_len = ResponseBuilder_BuildConfigValues(
+    out_len = ResponseBuilder_BuildPayload(
         buf,
         /*addr7=*/0x12,
-        vals,
+        /*cmd=*/CMD_GET_PAYLOAD_MASK,  // any opcode expecting a 3-byte return
+        /*values=*/arbitrary_vals,
         /*count=*/3
     );
-    // Header: [2]=0x12,[3]=CMD_GET_CONFIG,[4]=STATUS_OK,[5]=3
-    // Payload: [6]=0xAA,[7]=0xBB,[8]=0xCC
+    // Header: [0]=SOF, [1]=BOARD_ID, [2]=0x12, [3]=CMD_GET_PAYLOAD_MASK, [4]=STATUS_OK, [5]=3
+    // Payload: [6]=0xAA, [7]=0xBB, [8]=0xCC
     // Checksum: [9]
+    assert(out_len == (RESPONSE_HEADER_LENGTH + 3 + CHECKSUM_LENGTH));
+    assert(buf[2] == 0x12);
+    assert(buf[3] == CMD_GET_PAYLOAD_MASK);
+    assert(buf[4] == STATUS_OK);
     assert(buf[5] == 3);
     assert(buf[6] == 0xAA);
     assert(buf[7] == 0xBB);

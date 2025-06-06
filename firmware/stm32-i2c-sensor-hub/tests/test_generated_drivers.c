@@ -71,27 +71,39 @@ int main(void) {
 
         for (size_t f = 0; f < field_count; f++) {
             uint8_t get_id = fields[f];
-            uint8_t val    = 0;
             bool    ok;
 
-            // (i) Test read_config(GET_xxx):
-            printf("    • read_config for GET=0x%02X… ", get_id);
-            ok = info->read_config(ctx, get_id, &val);
-            if (!ok) {
-                printf("FAILED (read_config returned false)\n");
-                assert(ok == true);  // abort, showing get_id
+            // (i) Test read_config_bytes(GET_xxx):
+            printf("    • read_config_bytes for GET=0x%02X… ", get_id);
+            uint8_t tmp_buf[2] = {0, 0};
+            size_t  actual_len = 2;  // max buffer size
+            ok = info->read_config_bytes(ctx, get_id, tmp_buf, &actual_len);
+            if (!ok || actual_len == 0) {
+                printf("FAILED (read_config_bytes returned false or length=0)\n");
+                assert(ok == true);
             }
-            printf("OK (returned value=0x%02X)\n", val);
+
+            if (actual_len == 1) {
+                uint8_t val8 = tmp_buf[0];
+                printf("OK (returned 1 byte: 0x%02X)\n", val8);
+            } else if (actual_len == 2) {
+                uint16_t val16 = ((uint16_t)tmp_buf[0] << 8) | tmp_buf[1];
+                printf("OK (returned 2 bytes: 0x%04X)\n", val16);
+            } else {
+                // Unexpected length; treat as failure
+                printf("FAILED (unexpected out_len=%zu)\n", actual_len);
+                assert(false);
+            }
 
             // (ii) Derive the matching SET opcode:
             uint8_t set_id = 0xFF;
             if (get_id >= CMD_CONFIG_GETTERS_START && get_id <= CMD_CONFIG_GETTERS_END) {
                 // “[30..39] → [20..29]” by subtracting 10
-                set_id = (uint8_t)(get_id - 
-                           (CMD_CONFIG_GETTERS_START - CMD_CONFIG_SETTERS_START));
+                set_id = (uint8_t)(get_id -
+                       (CMD_CONFIG_GETTERS_START - CMD_CONFIG_SETTERS_START));
             }
             else if (get_id == CMD_GET_PAYLOAD_MASK) {
-                // GET=6, SET=5
+                // GET_PAYLOAD_MASK → SET_PAYLOAD_MASK
                 set_id = CMD_SET_PAYLOAD_MASK;
             }
             else {
@@ -100,12 +112,19 @@ int main(void) {
                 continue;
             }
 
+            // If GET returned two bytes (e.g. CMD_GET_CAL), skip single-byte configure:
+            if (actual_len != 1) {
+                printf("    • (GET=0x%02X returned %zu bytes; skipping single-byte configure)\n",
+                       get_id, actual_len);
+                continue;
+            }
             // (iii) Now call configure(SET_xxx, same val):
+            uint8_t val = tmp_buf[0];
             printf("    • configure with SET=0x%02X (value=0x%02X)… ", set_id, val);
             ok = info->configure(ctx, set_id, val);
             if (!ok) {
                 printf("FAILED (configure returned false)\n");
-                assert(ok == true);  // abort, showing set_id & val
+                assert(ok == true);
             }
             printf("OK\n");
         }
