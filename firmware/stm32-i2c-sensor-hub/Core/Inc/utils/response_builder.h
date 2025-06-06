@@ -68,32 +68,6 @@ size_t ResponseBuilder_BuildFieldResponse(
 );
 
 /**
- * @brief Build a “bulk‐config” response for CMD_GET_CONFIG.
- * Payload is exactly 4 bytes: [period_units, gain, range, calib_lsb].
- *
- * Frame format:
- *   [SOF][board_id][addr7][CMD_GET_CONFIG][STATUS_OK][length=4]
- *   [ period_u100 ][ gain ][ range ][ calib_lsb ]
- *   [ checksum ]
- *
- * @param outbuf        Must be at least RESPONSE_HEADER_LENGTH + 4 + CHECKSUM_LENGTH bytes.
- * @param addr7         7‐bit I²C address of target board
- * @param period_u100   period in 100ms units
- * @param gain          last gain code
- * @param range         last range code
- * @param calib_lsb     low byte of calibration register
- * @return total number of bytes written, or 0 on error
- */
-size_t ResponseBuilder_BuildGetConfig(
-    uint8_t *outbuf,
-    uint8_t  addr7,
-    uint8_t  period_u100,
-    uint8_t  gain,
-    uint8_t  range,
-    uint8_t  calib_lsb
-);
-
-/**
  * @brief Build a “list sensors” response.  Each sensor entry is two bytes:
  *   [type_code][addr7], repeated `count` times.
  *
@@ -145,26 +119,32 @@ size_t ResponseBuilder_BuildSamples(
 );
 
 /**
- * @brief Build a compact CMD_GET_CONFIG response containing config values.
+ * @brief Build a generic “N‐byte payload” response frame.
  *
- * Format:
- *   [SOF][board_id][addr7][CMD_GET_CONFIG][STATUS_OK][length=N]
- *   [ values[0] ... values[N-1] ]
+ * Any command that returns a payload of length N (1 ≤ N ≤ 255) can use this.
+ * For example: bulk‐config (CMD_GET_CONFIG), multi‐byte‐field GETs, etc.
+ *
+ * Frame format:
+ *   [SOF][board_id][addr7][cmd][STATUS_OK][length=N]
+ *     [ values[0] ] [ values[1] ] … [ values[N-1] ]
  *   [ checksum ]
  *
- * This assumes host and device agree on field order and count.
+ * @param outbuf   Preallocated buffer into which the full response will be written.
+ *                 Must be at least (RESPONSE_HEADER_LENGTH + count + CHECKSUM_LENGTH) bytes.
+ * @param addr7    7‐bit I²C address of the sensor being responded to.
+ * @param cmd      The command opcode (e.g. CMD_GET_CONFIG or any other CMD that expects N‐byte payload).
+ * @param values   Pointer to exactly N bytes of payload.  These bytes are copied verbatim.
+ * @param count    Number of payload bytes (0 < count ≤ 255).
  *
- * @param outbuf  Output buffer (must be at least 6 + count + 1 bytes)
- * @param addr7   Sensor address (7-bit)
- * @param values  Array of config values
- * @param count   Number of config values
- * @return        Total bytes written to outbuf, or 0 on error
+ * @return   Total length of the response frame (header + payload + checksum), or
+ *           0 on error (e.g. null pointers, count == 0, or count > 255).
  */
-size_t ResponseBuilder_BuildConfigValues(
-    uint8_t *outbuf,
-    uint8_t addr7,
+size_t ResponseBuilder_BuildPayload(
+    uint8_t  *outbuf,
+    uint8_t   addr7,
+    uint8_t   cmd,
     const uint8_t *values,
-    size_t count
+    size_t    count
 );
 
 #endif // RESPONSE_BUILDER_H

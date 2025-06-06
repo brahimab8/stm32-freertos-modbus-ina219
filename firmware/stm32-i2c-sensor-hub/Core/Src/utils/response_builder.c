@@ -57,7 +57,7 @@ static void Build_Checksum(uint8_t *outbuf, size_t start, size_t end) {
 
 
 /*--------------------------------------------------------------------
- * 1) Status‐only response:
+ * Status‐only response:
  *      [SOF][board_id][addr7][cmd][status][length=0]
  *      [ checksum ]
  *-------------------------------------------------------------------*/
@@ -82,7 +82,7 @@ size_t ResponseBuilder_BuildStatus(
 
 
 /*--------------------------------------------------------------------
- * 2) One‐byte field response:
+ * One‐byte field response:
  *      [SOF][board_id][addr7][cmd][status][length=1]
  *      [ field_value ]
  *      [ checksum ]
@@ -112,42 +112,7 @@ size_t ResponseBuilder_BuildFieldResponse(
 
 
 /*--------------------------------------------------------------------
- * 3) Bulk‐config response (4 bytes: [period_u100][gain][range][calib_lsb])
- *      [SOF][board_id][addr7][CMD_GET_CONFIG][STATUS_OK][length=4]
- *      [ period_u100 ][ gain ][ range ][ calib_lsb ]
- *      [ checksum ]
- *-------------------------------------------------------------------*/
-size_t ResponseBuilder_BuildGetConfig(
-    uint8_t *outbuf,
-    uint8_t  addr7,
-    uint8_t  period_u100,
-    uint8_t  gain,
-    uint8_t  range,
-    uint8_t  calib_lsb
-) {
-    // Header (length = 4)
-    size_t payload_off = Build_Header(outbuf, addr7, CMD_GET_CONFIG, STATUS_OK, 4);
-    if (payload_off == 0) {
-        return 0;
-    }
-
-    // Append the 4‐byte payload
-    outbuf[payload_off + 0] = period_u100;
-    outbuf[payload_off + 1] = gain;
-    outbuf[payload_off + 2] = range;
-    outbuf[payload_off + 3] = calib_lsb;
-
-    // Checksum at index payload_off + 4
-    size_t checksum_index = payload_off + 4;
-    Build_Checksum(outbuf, 1, checksum_index);
-
-    // Total length = header (6) + 4 payload + 1 checksum = 11
-    return checksum_index + 1;
-}
-
-
-/*--------------------------------------------------------------------
- * 4) List‐sensors response (each entry is two bytes [type_code][addr7])
+ * List‐sensors response (each entry is two bytes [type_code][addr7])
  *      [SOF][board_id][addr7][CMD_LIST_SENSORS][status][length=N*2]
  *        for i in 0..N-1:
  *          [ entries[i].type_code ]
@@ -189,7 +154,7 @@ size_t ResponseBuilder_BuildList(
 
 
 /*--------------------------------------------------------------------
- * 5) Read‐samples response:
+ * Read‐samples response:
  *      [SOF][board_id][addr7][CMD_READ_SAMPLES][STATUS_OK][length=payload_len]
  *        for each sample i:
  *          [ tick (4 bytes big‐endian) ]
@@ -255,34 +220,28 @@ size_t ResponseBuilder_BuildSamples(
     return checksum_index + 1;
 }
 
-/*--------------------------------------------------------------------
- * 6) Compact config-values response:
- *      [SOF][board_id][addr7][CMD_GET_CONFIG][STATUS_OK][length=N]
- *        [ value_0 ][ value_1 ] ... [ value_N-1 ]
- *      [ checksum ]
- *-------------------------------------------------------------------*/
-size_t ResponseBuilder_BuildConfigValues(
-    uint8_t *outbuf,
-    uint8_t addr7,
+size_t ResponseBuilder_BuildPayload(
+    uint8_t  *outbuf,
+    uint8_t   addr7,
+    uint8_t   cmd,
     const uint8_t *values,
-    size_t count
+    size_t    count
 ) {
-    if (!outbuf || !values || count == 0 || count > 32) {
+    if (!outbuf || !values || count == 0 || count > 255) {
+        // (length field is one byte, so max payload is 255)
         return 0;
     }
 
     uint8_t payload_len = (uint8_t)count;
-
-    // Build header
-    size_t payload_off = Build_Header(outbuf, addr7, CMD_GET_CONFIG, STATUS_OK, payload_len);
+    size_t payload_off = Build_Header(outbuf, addr7, cmd, STATUS_OK, payload_len);
     if (payload_off == 0) {
         return 0;
     }
 
-    // Copy config values directly
+    // Copy exactly 'count' bytes from values[] into the payload region
     memcpy(&outbuf[payload_off], values, count);
 
-    // Checksum after last value
+    // Write checksum after the last byte of payload
     size_t checksum_index = payload_off + count;
     Build_Checksum(outbuf, 1, checksum_index);
 

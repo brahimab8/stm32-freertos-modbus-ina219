@@ -46,8 +46,8 @@ void CommandTask(void *argument) {
             case CMD_LIST_SENSORS: {
                 SM_Entry_t list_entries[SM_MAX_SENSORS];
                 uint8_t   n = SensorManager_List(
-                    mgr, 
-                    list_entries, 
+                    mgr,
+                    list_entries,
                     SM_MAX_SENSORS
                 );
 
@@ -101,8 +101,8 @@ void CommandTask(void *argument) {
             case CMD_ADD_SENSOR: {
                 const SensorDriverInfo_t *info = SensorRegistry_Find(cmd.param);
                 uint32_t period = (info && info->get_default_period_ms)
-                                ? info->get_default_period_ms()
-                                : 500;  // fallback
+                                    ? info->get_default_period_ms()
+                                    : 500;  // fallback
 
                 uint8_t status = SensorManager_AddByType(
                     mgr, cmd.param, cmd.addr7, period
@@ -135,21 +135,23 @@ void CommandTask(void *argument) {
             }
 
             case CMD_GET_PAYLOAD_MASK: {
-                uint8_t mask_val;
-                SM_Status_t st = SensorManager_GetConfig(
-                    mgr, cmd.addr7, CMD_GET_PAYLOAD_MASK, &mask_val
-                );
-                if (st == SM_OK) {
-                    // Build a single‐byte payload
-                    size_t len = ResponseBuilder_BuildFieldResponse(
-                        txbuf,
-                        cmd.addr7,
-                        CMD_GET_PAYLOAD_MASK,
-                        mask_val
+                {
+                    uint8_t temp_buf[1];
+                    size_t  out_len = 0;
+                    SM_Status_t st = SensorManager_GetConfigBytes(
+                        mgr, cmd.addr7, CMD_GET_PAYLOAD_MASK, temp_buf, &out_len
                     );
-                    HAL_UART_Transmit(&huart1, txbuf, len, HAL_MAX_DELAY);
-                } else {
-                    send_status_response(&cmd, STATUS_ERROR);
+                    if (st == SM_OK && out_len == 1) {
+                        size_t len = ResponseBuilder_BuildFieldResponse(
+                            txbuf,
+                            cmd.addr7,
+                            CMD_GET_PAYLOAD_MASK,
+                            temp_buf[0]
+                        );
+                        HAL_UART_Transmit(&huart1, txbuf, len, HAL_MAX_DELAY);
+                    } else {
+                        send_status_response(&cmd, STATUS_ERROR);
+                    }
                 }
                 break;
             }
@@ -176,16 +178,20 @@ void CommandTask(void *argument) {
             }
 
             case CMD_CONFIG_GETTERS_START ... CMD_CONFIG_GETTERS_END: {
-                uint8_t val;
-                SM_Status_t st = SensorManager_GetConfig(
-                    mgr, cmd.addr7, cmd.cmd, &val
+                // Use multi-byte reader for every GET_… command
+                uint8_t  temp_buf[4];   // buffer for up to 4 returned bytes
+                size_t   out_len = 0;
+                SM_Status_t st = SensorManager_GetConfigBytes(
+                    mgr, cmd.addr7, cmd.cmd, temp_buf, &out_len
                 );
-                if (st == SM_OK) {
-                    size_t len = ResponseBuilder_BuildFieldResponse(
+                if (st == SM_OK && out_len > 0) {
+                    // Build a payload of length out_len
+                    size_t len = ResponseBuilder_BuildPayload(
                         txbuf,
                         cmd.addr7,
                         cmd.cmd,
-                        val
+                        temp_buf,
+                        out_len
                     );
                     HAL_UART_Transmit(&huart1, txbuf, len, HAL_MAX_DELAY);
                 } else {
@@ -195,6 +201,7 @@ void CommandTask(void *argument) {
             }
 
             case CMD_GET_CONFIG: {
+                // “Bulk-fetch all config fields”
                 const SensorDriverInfo_t *info = SensorRegistry_FindByAddr(mgr, cmd.addr7);
                 if (!info || !info->get_config_fields) {
                     send_status_response(&cmd, STATUS_ERROR);
@@ -208,22 +215,39 @@ void CommandTask(void *argument) {
                     break;
                 }
 
-                uint8_t values[16];
+                // Concatenate each field's returned bytes into payload_buf[].
+                // (Max 16 fields × max 4 bytes = 64 bytes total)
+                uint8_t payload_buf[64];
+                size_t  payload_idx = 0;
+
                 for (size_t i = 0; i < count; ++i) {
-                    SM_Status_t st = SensorManager_GetConfig(mgr, cmd.addr7, fields[i], &values[i]);
-                    if (st != SM_OK) {
+                    uint8_t  temp_buf[4];
+                    size_t   single_len = 0;
+                    SM_Status_t st = SensorManager_GetConfigBytes(
+                        mgr, cmd.addr7, fields[i], temp_buf, &single_len
+                    );
+                    if (st != SM_OK || single_len == 0) {
                         send_status_response(&cmd, STATUS_ERROR);
-                        return; // Abort immediately on error
+                        goto skip_get_config;
+                    }
+                    // Copy returned bytes into payload_buf
+                    for (size_t b = 0; b < single_len; ++b) {
+                        payload_buf[payload_idx++] = temp_buf[b];
                     }
                 }
 
-                size_t len = ResponseBuilder_BuildConfigValues(
-                    txbuf,
-                    cmd.addr7,
-                    values,
-                    count
-                );
-                HAL_UART_Transmit(&huart1, txbuf, len, HAL_MAX_DELAY);
+                {
+                    size_t len = ResponseBuilder_BuildPayload(
+                        txbuf,
+                        cmd.addr7,
+                        cmd.cmd,       // == CMD_GET_CONFIG
+                        payload_buf,
+                        payload_idx    // total concatenated length
+                    );
+                    HAL_UART_Transmit(&huart1, txbuf, len, HAL_MAX_DELAY);
+                }
+
+            skip_get_config:
                 break;
             }
 
