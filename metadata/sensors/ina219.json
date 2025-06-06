@@ -1,11 +1,12 @@
-{  
+{
   "name": "ina219",
 
   "config_defaults": {
-    "period":      5,
-    "gain":        0,
-    "bus_range":   0,
-    "calibration": 0
+    "period":          5,
+    "gain":            0,
+    "bus_range":       0,
+    "shunt_milliohm":  100,
+    "current_lsb_uA":  100
   },
 
   "config_fields": [
@@ -58,6 +59,34 @@
       "range": "0=16V, 1=32V"
     },
     {
+      "name":        "shunt_milliohm",
+      "getter_cmd":  "CMD_GET_SHUNT",
+      "setter_cmd":  "CMD_SET_SHUNT",
+      "type":        "uint8",
+      "size":        1,
+      "reg_addr":    null,
+      "mask":        null,
+      "shift":       null,
+      "endian":      null,
+      "driver_side": false,
+      "description": "Shunt resistor value (mΩ)",
+      "range":       "1–255"
+    },
+    {
+      "name":        "current_lsb_uA",
+      "getter_cmd":  "CMD_GET_CURRENT_LSB",
+      "setter_cmd":  "CMD_SET_CURRENT_LSB",
+      "type":        "uint8",
+      "size":        1,
+      "reg_addr":    null,
+      "mask":        null,
+      "shift":       null,
+      "endian":      null,
+      "driver_side": false,
+      "description": "Current LSB (µA per bit)",
+      "range":       "1–255"
+    },
+    {
       "name":        "calibration",
       "getter_cmd":  "CMD_GET_CAL",
       "setter_cmd":  "CMD_SET_CAL",
@@ -68,15 +97,18 @@
       "shift":       0,
       "endian":      "big",
       "driver_side": true,
-      "description": "Calibration register value (scales current/power)",
-      "range": "0–65535"
+      "computed":    true,
+      "depends_on":  ["shunt_milliohm","current_lsb_uA"],
+      "formula":     "((uint16_t)(0.04096f / (((float)c->current_lsb_uA / 1e6f) * ((float)c->shunt_milliohm / 1000.0f)) + 0.5f))",
+      "description": "CAL = 0.04096 / (LSB × R_shunt)",
+      "range":       "0–65535"
     },
     {
       "name":        "all",
       "getter_cmd":  "CMD_GET_CONFIG",
       "setter_cmd":  null,
-      "type":        "uint8[4]",
-      "size":        4,
+      "type":        "uint8[8]",
+      "size":        8,
       "reg_addr":    null,
       "mask":        null,
       "shift":       null,

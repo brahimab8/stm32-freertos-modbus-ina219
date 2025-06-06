@@ -27,12 +27,15 @@
     "CMD_SET_GAIN":         21,
     "CMD_SET_RANGE":        22,
     "CMD_SET_CAL":          23,
+    "CMD_SET_SHUNT":        24,
+    "CMD_SET_CURRENT_LSB":  25,
 
     "CMD_GET_PERIOD":       30,
     "CMD_GET_GAIN":         31,
     "CMD_GET_RANGE":        32,
-    "CMD_GET_CAL":          33
-
+    "CMD_GET_CAL":          33,
+    "CMD_GET_SHUNT":        34,
+    "CMD_GET_CURRENT_LSB":  35
   },
 
   "command_ranges": {

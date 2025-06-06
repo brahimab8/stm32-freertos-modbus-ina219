@@ -66,8 +66,19 @@
           "enum_labels": {
             "type": "object",
             "additionalProperties": { "type": "string" }
+          },
+          "computed":  {
+            "type": "boolean", 
+            "default": false 
+          },
+          "depends_on": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "formula":   { 
+            "type": ["string","null"] 
           }
-    },
+      },
 
         "required": ["name", "getter_cmd", "type", "size", "driver_side"],
         "if": {
@@ -81,7 +92,9 @@
             "reg_addr": { "type": "null" },
             "mask":     { "type": ["string", "null"] },
             "shift":    { "type": ["integer", "null"] },
-            "endian":   { "type": ["string", "null"] }
+            "endian":   { "type": ["string", "null"] },
+            "depends_on": { "type": "array", "items": { "type": "string" } }
+
           }
         },
         "additionalProperties": false
