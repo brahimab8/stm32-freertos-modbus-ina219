@@ -34,7 +34,7 @@ jobs:
           file: firmware/stm32-i2c-sensor-hub/tests/coverage.info
           flags: c
           verbose: true
-
+          token: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Upload coverage-info artifact
         uses: actions/upload-artifact@v4
