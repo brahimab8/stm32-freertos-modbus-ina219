@@ -1,4 +1,5 @@
 [![Build Status](https://github.com/brahimab8/stm32-i2c-sensor-hub/actions/workflows/ci.yml/badge.svg)](https://github.com/brahimab8/stm32-i2c-sensor-hub/actions)
+[![CI – C Tests](https://github.com/brahimab8/stm32-i2c-sensor-hub/actions/workflows/ci.yml/badge.svg)](https://github.com/brahimab8/stm32-i2c-sensor-hub/actions/workflows/ci.yml)
 
 # STM32 I²C Sensor Hub
 
