@@ -31,7 +31,7 @@ jobs:
       - name: Upload C coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
-          files: firmware/stm32-i2c-sensor-hub/tests/coverage.info
+          file: firmware/stm32-i2c-sensor-hub/tests/coverage.info
           flags: c
           verbose: true
 
