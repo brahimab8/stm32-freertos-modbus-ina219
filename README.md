@@ -1,3 +1,5 @@
+[![Build Status](https://github.com/brahimab8/stm32-i2c-sensor-hub/actions/workflows/ci.yml/badge.svg)](https://github.com/brahimab8/stm32-i2c-sensor-hub/actions)
+
 # STM32 I²C Sensor Hub
 
 **Centralized I²C sensor management over RS-485: STM32-based firmware with a Python CLI.**
