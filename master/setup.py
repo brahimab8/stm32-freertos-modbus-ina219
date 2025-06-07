@@ -11,11 +11,13 @@ setup(
         "click>=8.0",
         "PyQt5>=5.15",
         "tqdm>=4.0",
+        "jsonschema>=4.0.0",
     ],
     extras_require={
         "dev": [
             "pytest>=8.0",
-            "pytest-cov>=6.0"
+            "pytest-cov>=6.0",
+            "jsonschema>=4.0.0",
         ]
     },
     entry_points={
