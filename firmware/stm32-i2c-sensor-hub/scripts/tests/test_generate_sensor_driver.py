@@ -1,46 +1,7 @@
-import importlib.util
-import sys
+import json
 from pathlib import Path
 import pytest
-import types
-
-SCRIPTS_DIR = (
-    Path(__file__).parent
-    / ".."
-    / "firmware"
-    / "stm32-i2c-sensor-hub"
-    / "scripts"
-).resolve()
-
-
-@pytest.fixture(scope="module")
-def generator_modules():
-    """
-    Dynamically load config_generator, hal_generator, and generate_sensor_driver modules.
-    """
-    # 1) Ensure the parent of “scripts/” is on sys.path
-    package_root = SCRIPTS_DIR.parent
-    sys.path.insert(0, str(package_root))
-
-    mod_map = {}
-    for fname, modname in [
-        ("config_generator.py", "scripts.config_generator"),
-        ("hal_generator.py", "scripts.hal_generator"),
-        ("generate_sensor_driver.py", "scripts.generate_sensor_driver"),
-    ]:
-        path = SCRIPTS_DIR / fname
-        spec = importlib.util.spec_from_file_location(modname, str(path))
-        module = importlib.util.module_from_spec(spec)
-        sys.modules[modname] = module
-        spec.loader.exec_module(module)
-        mod_map[modname.split(".")[-1]] = module
-
-    return (
-        mod_map["config_generator"],
-        mod_map["hal_generator"],
-        mod_map["generate_sensor_driver"],
-    )
-
+from scripts import config_generator, hal_generator, generate_sensor_driver
 
 @pytest.fixture
 def toy_sensor_meta():
@@ -80,6 +41,13 @@ def toy_sensor_meta():
         ],
         "default_payload_bits": [0]
     }
+
+@pytest.fixture(scope="module")
+def generator_modules():
+    """
+    Return the three generator modules from the scripts package.
+    """
+    return config_generator, hal_generator, generate_sensor_driver
 
 
 def test_gen_sensor_config_creates_expected(tmp_path, toy_sensor_meta, generator_modules):
@@ -160,14 +128,12 @@ def test_gen_sensor_driver_files_creates_driver(tmp_path, toy_sensor_meta, gener
     # 1) HAL‐wrapper header + source
     hal_hdr = out_dir / "Inc" / "drivers" / f"{sc}.h"
     hal_src = out_dir / "Src" / "drivers" / f"{sc}.c"
-    assert hal_hdr.exists(), f"{hal_hdr} not created"
-    assert hal_src.exists(), f"{hal_src} not created"
+    assert hal_hdr.exists() and hal_src.exists()
 
     # 2) Driver‐layer header + source
     drv_hdr = out_dir / "Inc" / "drivers" / f"{sc}_driver.h"
     drv_src = out_dir / "Src" / "drivers" / f"{sc}_driver.c"
-    assert drv_hdr.exists(), f"{drv_hdr} not created"
-    assert drv_src.exists(), f"{drv_src} not created"
+    assert drv_hdr.exists() and drv_src.exists()
 
     drv_hdr_text = drv_hdr.read_text()
     # The driver header should at least declare init_ctx and read_config
