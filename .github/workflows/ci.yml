@@ -14,9 +14,6 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v3
 
-      - name: Smoke-test gcc
-        run: gcc --version
-
       - name: Install C build dependencies
         run: |
           sudo apt-get update
@@ -24,10 +21,27 @@ jobs:
             build-essential \
             lcov
 
-      - name: Build and run C tests
+      - name: Build, run C tests & generate coverage
         working-directory: firmware/stm32-i2c-sensor-hub/tests
         run: |
           make clean
           make all
-          ./test_response_runner
-          ./test_drivers_runner
+          make coverage-html
+
+      - name: Upload C coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: firmware/stm32-i2c-sensor-hub/tests/coverage.info
+          flags: c
+
+      - name: Upload coverage-info artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: c-coverage-info
+          path: firmware/stm32-i2c-sensor-hub/tests/coverage.info
+
+      - name: Upload coverage HTML artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: c-coverage-html
+          path: firmware/stm32-i2c-sensor-hub/tests/coverage-report/
