@@ -23,11 +23,11 @@ jobs:
           python-version: "3.x"
 
       - name: Install all Python dependencies
+        working-directory: master
         run: |
           python -m pip install --upgrade pip
-          # install master package + dev extras (pytest, pytest-cov, etc.)
-          pip install -r master/requirements.txt
-          pip install -e master.[dev]
+          pip install -r requirements.txt
+          pip install -e .[dev]
 
       - name: Run pytest across both codebases
         run: |
