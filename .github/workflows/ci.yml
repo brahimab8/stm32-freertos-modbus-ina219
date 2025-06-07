@@ -32,7 +32,7 @@ jobs:
       - name: Run pytest across both codebases
         run: |
           pytest \
-            firmware/stm32-i2c-sensor-hub/scripts \
+            firmware/stm32-i2c-sensor-hub/scripts/tests \
             master/tests \
             --cov=firmware/stm32-i2c-sensor-hub/scripts \
             --cov=master \
