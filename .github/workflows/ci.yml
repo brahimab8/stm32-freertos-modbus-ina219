@@ -8,11 +8,50 @@ on:
     branches: [main]
 
 jobs:
-  build-and-c-tests:
+  python-tests:
+    name: Python Tests & Coverage
+    runs-on: ubuntu-latest
+    env:
+      PYTHONUNBUFFERED: 1
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.x"
+
+      - name: Install all Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # install master package + dev extras (pytest, pytest-cov, etc.)
+          pip install -r master/requirements.txt
+          pip install -e master.[dev]
+
+      - name: Run pytest across both codebases
+        run: |
+          pytest \
+            firmware/stm32-i2c-sensor-hub/scripts \
+            master/tests \
+            --cov=firmware/stm32-i2c-sensor-hub/scripts \
+            --cov=master \
+            --cov-report=xml:python-coverage.xml \
+            --cov-report=term-missing
+
+      - name: Upload Python coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: python-coverage.xml
+          flags: py
+          token: ${{ secrets.CODECOV_TOKEN }}
+          verbose: true
+
+  c-tests:
+    name: C Tests & Coverage
     runs-on: ubuntu-latest
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
       - name: Install C build dependencies
         run: |
