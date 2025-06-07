@@ -35,13 +35,13 @@ jobs:
           flags: c
 
       - name: Upload coverage-info artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: c-coverage-info
           path: firmware/stm32-i2c-sensor-hub/tests/coverage.info
 
       - name: Upload coverage HTML artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: c-coverage-html
           path: firmware/stm32-i2c-sensor-hub/tests/coverage-report/
