@@ -1,8 +1,8 @@
 import struct
 import pytest
-import sensor_master.core as core_mod
-from sensor_master.protocol import protocol
-from sensor_master.sensors import registry
+import core.core as core_mod
+from core.protocol import protocol
+from core.sensors import registry
 
 # DummySerial to intercept reads/writes
 class DummySerial:

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 import click
 
-from sensor_master.protocol import protocol
-from sensor_master.sensors import registry
-from sensor_master.backend import SensorBackend, Mode
+from core.protocol import protocol
+from core.sensors import registry
+from core.backend import SensorBackend, Mode
 
 STATUS_NAMES = {v: k for k, v in protocol.status_codes.items()}
 
@@ -27,7 +27,7 @@ def handle_result(label, status):
 @click.pass_context
 def session(ctx):
     """Enter an interactive sensor-cli session."""
-    from sensor_master.cli.shell import SensorShell
+    from core.cli.shell import SensorShell
     SensorShell(ctx.obj).cmdloop()
 
 

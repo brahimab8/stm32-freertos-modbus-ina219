@@ -3,9 +3,9 @@ import cmd
 import shlex
 import time
 
-from sensor_master.protocol import protocol
-from sensor_master.sensors import registry
-from sensor_master.backend import SensorBackend, Mode
+from core.protocol import protocol
+from core.sensors import registry
+from core.backend import SensorBackend, Mode
 
 STATUS_NAMES = {v: k for k, v in protocol.status_codes.items()}
 

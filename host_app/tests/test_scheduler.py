@@ -2,10 +2,10 @@ import threading
 import pytest
 import time
 
-import sensor_master.scheduler as scheduler_mod
-from sensor_master.scheduler import StreamScheduler
-from sensor_master.boards import BoardManager
-from sensor_master.sensors import registry as sensor_registry
+import core.scheduler as scheduler_mod
+from core.scheduler import StreamScheduler
+from core.boards import BoardManager
+from core.sensors import registry as sensor_registry
 
 
 class DummyBound:

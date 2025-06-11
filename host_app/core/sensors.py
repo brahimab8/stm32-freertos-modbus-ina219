@@ -1,12 +1,8 @@
 import json
 import os
 import struct
+from .paths import SENSORS_DIR
 from .protocol import protocol
-
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-REPO_ROOT = os.path.abspath(os.path.join(BASE_DIR, os.pardir, os.pardir))
-SENSORS_DIR = os.path.join(REPO_ROOT, 'metadata', 'sensors')
-
 
 class SensorRegistry:
     """

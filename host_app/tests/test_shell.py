@@ -1,7 +1,7 @@
 import pytest
-from sensor_master.protocol import protocol
-from sensor_master.cli.shell import SensorShell
-from sensor_master.backend import SensorBackend
+from core.protocol import protocol
+from cli.shell import SensorShell
+from core.backend import SensorBackend
 
 # DummySerial to prevent actual COM-port access in SensorBackend
 class DummySerial:
@@ -53,7 +53,7 @@ class DummyMgr:
 
 @pytest.fixture(autouse=True)
 def patch_serial(monkeypatch):
-    import sensor_master.core as core_mod
+    import core.core as core_mod
     monkeypatch.setattr(core_mod.serial, 'Serial', DummySerial)
     yield
 

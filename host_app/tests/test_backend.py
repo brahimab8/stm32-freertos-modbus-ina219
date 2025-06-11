@@ -1,7 +1,7 @@
 import pytest
 
-import sensor_master.backend as backend_mod
-from sensor_master.backend import SensorBackend, Mode
+import core.backend as backend_mod
+from core.backend import SensorBackend, Mode
 
 
 class DummyBound:

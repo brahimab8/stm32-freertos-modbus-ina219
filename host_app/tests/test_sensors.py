@@ -1,8 +1,8 @@
 import os
 import json
 import pytest
-from sensor_master.sensors import registry, SENSORS_DIR
-from sensor_master.protocol import protocol
+from core.sensors import registry, SENSORS_DIR
+from core.protocol import protocol
 
 # Sensor metadata JSON files directory is exported by the sensors module
 

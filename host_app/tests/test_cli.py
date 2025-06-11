@@ -1,8 +1,8 @@
 import pytest
 from click.testing import CliRunner
-from sensor_master.protocol import protocol
-from sensor_master.cli.click import cli 
-import sensor_master.core as core_mod
+from core.protocol import protocol
+from cli.click import cli 
+import core.core as core_mod
 
 class DummySerial:
     def __init__(self, port, baud, timeout=None):
@@ -22,11 +22,11 @@ def patch_serial(monkeypatch):
 def patch_backend(monkeypatch):
     # Stub out add_sensor and ping on SensorBackend so CLI won't try real hardware
     monkeypatch.setattr(
-        'sensor_master.backend.SensorBackend.add_sensor',
+        'core.backend.SensorBackend.add_sensor',
         lambda self, board, addr, sensor: protocol.status_codes['STATUS_OK']
     )
     monkeypatch.setattr(
-        'sensor_master.backend.SensorBackend.ping',
+        'core.backend.SensorBackend.ping',
         lambda self, board: protocol.status_codes['STATUS_NOT_FOUND']
     )
     yield

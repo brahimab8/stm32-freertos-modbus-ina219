@@ -1,10 +1,5 @@
 import json
-import os
-
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-REPO_ROOT = os.path.abspath(os.path.join(BASE_DIR, os.pardir, os.pardir))
-META_DIR = os.path.join(REPO_ROOT, 'metadata')
-PROTO_FILE = os.path.join(META_DIR, 'protocol.json')
+from .paths import PROTO_FILE
 
 class Protocol:
     def __init__(self, path=PROTO_FILE):

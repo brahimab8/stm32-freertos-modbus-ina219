@@ -1,7 +1,7 @@
 import pytest
-from sensor_master.boards import BoardManager
-from sensor_master.protocol import protocol
-from sensor_master.sensors import registry
+from core.boards import BoardManager
+from core.protocol import protocol
+from core.sensors import registry
 
 
 class FakeSM:
@@ -126,13 +126,13 @@ def fake_registry(monkeypatch):
 def patch_sm(monkeypatch):
     """
     Monkeypatch SensorMaster so that BoardManager(...) → FakeSM() underneath.
-    We patch 'sensor_master.boards.SensorMaster' because BoardManager does:
+    We patch 'core.boards.SensorMaster' because BoardManager does:
         from .core import SensorMaster
-    in sensor_master/boards.py.
+    in core/boards.py.
     """
     fake = FakeSM()
     monkeypatch.setattr(
-        'sensor_master.boards.SensorMaster',
+        'core.boards.SensorMaster',
         lambda *args, **kw: fake
     )
     return fake

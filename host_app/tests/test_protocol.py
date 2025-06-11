@@ -1,7 +1,7 @@
 import os
 import json
 import pytest
-from sensor_master.protocol import protocol, PROTO_FILE
+from core.protocol import protocol, PROTO_FILE
 
 def test_protocol_file_exists():
     assert os.path.isfile(PROTO_FILE), f"protocol.json not found at {PROTO_FILE}"
