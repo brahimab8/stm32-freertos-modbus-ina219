@@ -1,0 +1,36 @@
+[build-system]
+requires    = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+name        = "multi-mcu-hub"
+version     = "0.1.0"
+description = "Host-side application for managing multiple MCU sensor & actuator nodes"
+authors     = ["Brahim Abdelkafi"]
+packages    = [
+  { include = "core" },
+  { include = "cli"  },
+  { include = "gui"  },
+]
+
+[tool.poetry.dependencies]
+# Restrict to <3.12 so PySide6 can always find a compatible wheel
+python   = ">=3.9,<3.12"
+pyserial = "^3.5"
+tqdm     = "^4.0"
+click    = "^8.0"
+PySide6  = { version = "^6.5", optional = true }
+
+[tool.poetry.extras]
+gui = ["PySide6"]
+
+[tool.poetry.group.dev]
+optional = true
+
+[tool.poetry.group.dev.dependencies]
+pytest     = "^8.0"
+pytest-cov = "^6.0"
+
+[tool.poetry.scripts]
+mcu-hub-cli = "cli.click:cli"
+mcu-hub-gui = "gui.app:main"
