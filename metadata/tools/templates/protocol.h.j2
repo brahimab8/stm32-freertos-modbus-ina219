@@ -1,0 +1,57 @@
+/* Auto-generated from protocol.json; do not edit! */
+#pragma once
+#include <stdint.h>
+#include <stddef.h>
+
+{% if constants %}
+ // Simple #defines
+{% for name, val in constants.items() %}
+#define {{ name.ljust(20) }} {{ val }}
+{% endfor %}
+
+{% endif %}
+#define RESPONSE_HEADER_LENGTH  offsetof(RESPONSE_HEADER_t, length) + 1
+#define CMD_FRAME_SIZE          sizeof(COMMAND_t)
+
+{% if status_codes %}
+ // Status codes
+{% for name, val in status_codes.items() %}
+#define {{ name.ljust(20) }} {{ val }}
+{% endfor %}
+
+{% endif %}
+{% if commands %}
+ // Command codes
+{% for name, val in commands.items() %}
+#define {{ name.ljust(20) }} {{ val }}
+{% endfor %}
+
+{% endif %}
+{% if command_ranges %}
+ // Command ID ranges
+{% for key, bounds in command_ranges.items() %}
+#define CMD_{{ key.upper() }}_START {{ bounds[0] }}
+#define CMD_{{ key.upper() }}_END   {{ bounds[1] }}
+{% endfor %}
+
+{% endif %}
+{% if sensors %}
+ // Sensor type codes
+{% for name, code in sensors.items() %}
+#define SENSOR_TYPE_{{ name.upper().ljust(10) }} {{ code }}
+{% endfor %}
+
+{% endif %}
+{% for frame_name, frame in frames.items() %}
+// {{ frame.get("description", "") }}
+typedef struct {
+{% for fld in frame.fields %}
+  {% if fld.type == "bytes" %}
+    uint8_t {{ fld.name }}[];
+  {% else %}
+    {{ ctype_map.get(fld.type, "uint8_t") }} {{ fld.name }};
+  {% endif %}
+{% endfor %}
+} {{ frame_name.upper() }}_t;
+
+{% endfor %}

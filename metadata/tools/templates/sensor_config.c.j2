@@ -1,0 +1,21 @@
+/* Auto-generated {{ name }} defaults definition */
+#include "config/{{ key }}_config.h"
+
+{% set STRUCT = UPPER + "_config_defaults_t" %}
+
+/**
+ * @brief Default values for sensor {{ name }} configuration.
+ */
+{{ STRUCT }} {{ key }}_defaults = {
+{% for fld_name, default_val in config_defaults.items() %}
+    .{{ fld_name }} =
+    {%- set cf = config_fields_map.get(fld_name) %}
+    {%- if cf and cf.enum_labels and (default_val|string) in cf.enum_labels %}
+        {{ UPPER }}_{{ fld_name.upper() }}_{{ cf.enum_labels[default_val|string] | replace('[^A-Z0-9]', '_') | upper() }}
+    {%- elif cf and cf.base_ctype in ["uint16_t", "int16_t", "uint32_t", "int32_t"] %}
+        ({{ cf.base_ctype }}){{ default_val }}
+    {%- else %}
+        {{ default_val }}
+    {%- endif %},
+{% endfor %}
+};

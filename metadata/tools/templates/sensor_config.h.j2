@@ -1,0 +1,20 @@
+/* Auto-generated {{ name }}_config.h; do not edit! */
+#pragma once
+
+#include <stdint.h>
+#include "drivers/{{ key }}.h"
+
+{% set UPPER = name.upper() %}
+{% set STRUCT = UPPER + "_config_defaults_t" %}
+/**
+ * @brief Default configuration values for sensor {{ name }}.
+ */
+typedef struct {
+{% for fld_name, default_val in config_defaults.items() %}
+    {{ UPPER }}_{{ fld_name.upper() }}_t {{ fld_name }};
+{% endfor %}
+} {{ STRUCT }};
+
+#define SENSOR_PAYLOAD_SIZE_{{ UPPER }} {{ default_payload_size }}
+
+extern {{ STRUCT }} {{ key }}_defaults;
