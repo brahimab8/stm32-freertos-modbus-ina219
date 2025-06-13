@@ -27,99 +27,103 @@ class SensorRegistry:
             if not fn.endswith('.json'):
                 continue
             path = os.path.join(SENSORS_DIR, fn)
-            meta = json.load(open(path, 'r', encoding='utf-8'))
-            name = meta['name'].lower()
+            with open(path, "r", encoding="utf-8") as f:
+                meta = json.load(f)
 
-            # store raw JSON under registry
+            name = meta["name"].lower()
             self._metadata[name] = meta
 
-            # look up the numeric type code from protocol.sensors[name]
+            # numeric type code
             type_code = protocol.sensors[name]
             self._types[name] = type_code
             self._reverse_types[type_code] = name
 
-            # compute “payload size”
-            default_bits = meta.get('default_payload_bits', [])
+            # compute payload_size from metadata count*width
+            payload_fields = meta.get("payload_fields", [])
+            default_bits = meta.get("default_payload_bits", [])
+
+            def field_bytes(f):
+                count = f.get("count", 1)
+                width = f.get("width", 1)
+                return count * width
+
             if default_bits:
-                size = sum(meta['payload_fields'][i]['size']
-                           for i in default_bits)
+                size = 0
+                for idx in default_bits:
+                    try:
+                        fld = payload_fields[idx]
+                    except IndexError:
+                        continue
+                    size += field_bytes(fld)
             else:
-                size = sum(f['size'] for f in meta['payload_fields'])
-            
+                size = sum(field_bytes(f) for f in payload_fields)
+
             self._payload_sizes[name] = size
 
     def type_code(self, name: str) -> int:
-        """Given a sensor‐name (e.g. "ina219"), return its numeric type code."""
         return self._types[name.lower()]
 
     def payload_size(self, name: str) -> int:
-        """Return total streaming payload length (sum of that sensor’s payload_fields[].size)."""
         return self._payload_sizes[name.lower()]
 
     def metadata(self, name: str) -> dict:
-        """
-        Return the raw JSON metadata (as a Python dict) for sensor `name`.
-        You can then inspect fields like:
-          md['payload_fields']   (list of streaming‐payload descriptors)
-          md['config_fields']    (list of config getter descriptors, if present)
-          md['config_defaults']  (dictionary of default values)
-          md['default_payload_bits']  (list of bit‐indices)
-        """
         return self._metadata[name.lower()]
 
     def name_from_type(self, type_code: int) -> str:
-        """
-        Reverse lookup: given a numeric type_code, return the sensor‐name.
-        If not found, returns e.g. "unknown(17)".
-        """
         return self._reverse_types.get(type_code, f"unknown({type_code})")
 
     def available(self) -> list[str]:
-        """List all known sensor type names (e.g. ["ina219", "mpu6050", …])."""
         return list(self._metadata.keys())
 
     def parse_payload(self, name: str, raw: bytes, mask: int) -> dict:
-        """
-        Given a raw payload (the bytes from CMD_READ_SAMPLES) AND a one-byte mask,
-        split it according to that sensor’s `payload_fields` and return a dict.
-
-        - 'mask' is a single byte: if bit k is set, then the k-th entry in
-          payload_fields[] is present in this packet (in the same order).
-        """
-        md = self.metadata(name.lower())
+        md = self.metadata(name)
         out = {}
         offset = 0
 
-        # 1) First 4 bytes are always the tick (big‐endian uint32)
+        # First 4 bytes: tick (unsigned 32-bit big-endian)
         if len(raw) < 4:
-            # not enough data
             return {}
-        out['tick'] = struct.unpack_from('>I', raw, offset)[0]
+        out["tick"] = struct.unpack_from(">I", raw, offset)[0]
         offset += 4
 
-        # 2) For each payload_field, only consume bytes if its bit is set
-        for idx, fld in enumerate(md['payload_fields']):
+        for idx, fld in enumerate(md.get("payload_fields", [])):
             if not (mask & (1 << idx)):
-                # skip this field entirely
                 continue
 
-            size = fld['size']
+            count = fld.get("count", 1)
+            width = fld.get("width", 1)
+            size = count * width
+
             if offset + size > len(raw):
-                # incomplete packet
-                return out
+                break
+
             chunk = raw[offset : offset + size]
             offset += size
 
-            t = fld['type']
-            if t.startswith('uint'):
-                val = int.from_bytes(chunk, byteorder='big', signed=False)
-            elif t.startswith('int'):
-                val = int.from_bytes(chunk, byteorder='big', signed=True)
-            else:
-                # fallback: return hex string
-                val = chunk.hex()
+            signed = fld.get("signed", False)
+            reg_mask = int(fld["mask"], 16) if fld.get("mask") else None
 
-            out[fld['name']] = val
+            if count == 1:
+                if signed:
+                    val = int.from_bytes(chunk, "big", signed=True)
+                else:
+                    val = int.from_bytes(chunk, "big", signed=False)
+                    if reg_mask is not None:
+                        val &= reg_mask
+            else:
+                vals = []
+                for i in range(0, size, width):
+                    sub = chunk[i : i + width]
+                    if signed:
+                        v = int.from_bytes(sub, "big", signed=True)
+                    else:
+                        v = int.from_bytes(sub, "big", signed=False)
+                        if reg_mask is not None:
+                            v &= reg_mask
+                    vals.append(v)
+                val = vals
+
+            out[fld["name"]] = val
 
         return out
 
