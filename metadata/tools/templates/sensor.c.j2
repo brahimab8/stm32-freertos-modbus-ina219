@@ -1,0 +1,134 @@
+/* Auto-generated {{ key }}.c */
+#include "drivers/{{ key }}.h"
+#include <hal_if.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+{% set UPPER = key.upper() %}
+
+/* Helper: assemble big-endian unsigned integer */
+static uint64_t be_assemble(const uint8_t *data, int bytes) {
+    uint64_t acc = 0;
+    for (int i = 0; i < bytes; ++i) {
+        acc = (acc << 8) | data[i];
+    }
+    return acc;
+}
+
+/* Helper: write big-endian 'value' into buf[0..bytes-1] */
+static void write_be(uint8_t *buf, uint64_t value, int bytes) {
+    for (int i = 0; i < bytes; ++i) {
+        int shift = 8 * (bytes - 1 - i);
+        buf[i] = (uint8_t)((value >> shift) & 0xFF);
+    }
+}
+
+/* Config-field Set/Read functions */
+{% for cf in config_fields if cf.name != "all" %}
+{% set pascal = cf.name.split('_') | map('capitalize') | join('') %}
+
+/**
+ * @brief  Set the {{ cf.name }} field.
+ */
+halif_status_t {{ UPPER }}_Set{{ pascal }}(
+    halif_handle_t h_i2c,
+    uint8_t        addr7bit,
+    {{ UPPER }}_{{ cf.name.upper() }}_t value
+) {
+    {% if cf.enum_labels %}
+    {% set enum_keys = cf.enum_labels.keys() | list %}
+    {% set enum_ints = enum_keys | map('int') | list %}
+    {% set enum_min = enum_ints | min %}
+    {% set enum_max = enum_ints | max %}
+    if ((int)value < {{ enum_min }} || (int)value > {{ enum_max }}) {
+        return HALIF_ERROR;
+    }
+    {% elif cf.range_min is defined and cf.range_max is defined %}
+    if ((int64_t)value < (int64_t){{ cf.range_min }} || (int64_t)value > (int64_t){{ cf.range_max }}) {
+        return HALIF_ERROR;
+    }
+    {% endif %}
+
+    {%- if cf.reg_addr is not none %}
+    // Read current register
+    uint8_t cmd = 0x{{ '%02X' % cf.reg_addr }};
+    uint8_t data_buf[{{ cf.width }}];
+    if (halif_i2c_write(h_i2c, addr7bit, &cmd, 1, 100) != HALIF_OK) {
+        return HALIF_ERROR;
+    }
+    if (halif_i2c_read(h_i2c, addr7bit, data_buf, sizeof(data_buf), 100) != HALIF_OK) {
+        return HALIF_ERROR;
+    }
+    uint64_t reg = be_assemble(data_buf, {{ cf.width }});
+    // Clear bits for this field
+    reg &= ~({{ cf.mask }});
+    // Insert new value shifted
+    reg |= ((uint64_t)value << {{ cf.shift }}) & {{ cf.mask }};
+    // Prepare write buffer: [reg_addr, big-endian bytes of reg]
+    uint8_t write_buf[{{ cf.width + 1 }}];
+    write_buf[0] = 0x{{ '%02X' % cf.reg_addr }};
+    write_be(&write_buf[1], reg, {{ cf.width }});
+    return halif_i2c_write(h_i2c, addr7bit, write_buf, sizeof(write_buf), 100);
+    {%- else %}
+    // Not register-backed; nothing to write on chip
+    (void)h_i2c; (void)addr7bit; (void)value;
+    return HALIF_OK;
+    {%- endif %}
+}
+
+{% if cf.getter_cmd is not none and cf.reg_addr is not none %}
+/**
+ * @brief  Read back the {{ cf.name }} field.
+ */
+halif_status_t {{ UPPER }}_Read{{ pascal }}(
+    halif_handle_t            h_i2c,
+    uint8_t                   addr7bit,
+    {{ UPPER }}_{{ cf.name.upper() }}_t *out
+) {
+    uint8_t cmd = 0x{{ '%02X' % cf.reg_addr }};
+    uint8_t data_buf[{{ cf.width }}];
+    if (halif_i2c_write(h_i2c, addr7bit, &cmd, 1, 100) != HALIF_OK) {
+        return HALIF_ERROR;
+    }
+    if (halif_i2c_read(h_i2c, addr7bit, data_buf, sizeof(data_buf), 100) != HALIF_OK) {
+        return HALIF_ERROR;
+    }
+    uint64_t reg = be_assemble(data_buf, {{ cf.width }});
+    uint64_t val = (reg & {{ cf.mask }}) >> {{ cf.shift }};
+    *out = ({{ UPPER }}_{{ cf.name.upper() }}_t)val;
+    return HALIF_OK;
+}
+{% endif %}
+{% endfor %}
+
+/* Payload-field Read functions */
+{% for pf in payload_fields %}
+{% set pascal = pf.name.split('_') | map('capitalize') | join('') %}
+
+halif_status_t {{ UPPER }}_Read{{ pascal }}(
+    halif_handle_t            h_i2c,
+    uint8_t                   addr7bit,
+    {{ UPPER }}_{{ pf.name.upper() }}_t *out
+) {
+    uint8_t cmd  = REG_{{ pf.name.upper().replace('-', '_') }};
+    uint8_t data[{{ pf.total_bytes }}];
+    if (halif_i2c_write(h_i2c, addr7bit, &cmd, 1, 100) != HALIF_OK) return HALIF_ERROR;
+    if (halif_i2c_read(h_i2c, addr7bit, data, sizeof(data), 100) != HALIF_OK) return HALIF_ERROR;
+
+    uint64_t uval = be_assemble(data, {{ pf.total_bytes }});
+    {% if pf.shift is defined and pf.shift > 0 %}
+    uval >>= {{ pf.shift }};
+    {% endif %}
+    {% if pf.mask is defined %}
+    uval &= {{ pf.mask }};
+    {% endif %}
+    *out = ({{ UPPER }}_{{ pf.name.upper() }}_t)(uval * {{ pf.scale_factor }});
+    return HALIF_OK;
+}
+{% endfor %}
+
+#ifdef __cplusplus
+}
+#endif

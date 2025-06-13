@@ -1,0 +1,105 @@
+/* Auto-generated {{ key }}.h */
+#pragma once
+
+#include <hal_if.h>
+#include <stdint.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+{% set UPPER = key.upper() %}
+
+/* --- Typedefs for config fields --- */
+{% for cf in config_fields %}
+{% set TYPEDEF = UPPER ~ '_' ~ cf.name.upper() ~ '_t' %}
+{% if cf.enum_labels %}
+typedef enum {
+    {% for v, label in cf.enum_labels.items() %}
+    {{ UPPER }}_{{ cf.name.upper() }}_{{ label | sanitize_label }} = {{ v }},
+    {% endfor %}
+} {{ TYPEDEF }};
+{% elif cf.is_array %}
+typedef {{ cf.base_ctype }} {{ TYPEDEF }}[{{ cf.count }}];
+{% else %}
+typedef {{ cf.base_ctype }} {{ TYPEDEF }};
+{% endif %}
+{% endfor %}
+
+/* --- Typedefs for payload fields --- */
+{% for pf in payload_fields %}
+{% set TYPEDEF = UPPER ~ '_' ~ pf.name.upper() ~ '_t' %}
+typedef {{ pf.base_ctype }} {{ TYPEDEF }};
+{% endfor %}
+
+/* --- Register address defines --- */
+{% for cf in config_fields if cf.reg_addr is not none %}
+#define REG_{{ cf.name.upper() }}   0x{{ '%02X' % cf.reg_addr }}
+{% endfor %}
+{% for pf in payload_fields %}
+#define REG_{{ pf.name.upper().replace('-', '_') }}   0x{{ '%02X' % pf.reg_addr }}
+{% endfor %}
+
+/* --- Payload field indices and bitmask defines for {{ key }} --- */
+typedef enum {
+    {% for pf in payload_fields %}
+    {{ UPPER }}_PAYLOAD_IDX_{{ pf.name.upper().replace('-', '_') }} = {{ loop.index0 }}{% if not loop.last %},{% endif %}
+    {% endfor %},
+    {{ UPPER }}_PAYLOAD_IDX_COUNT
+} {{ UPPER }}_PayloadIndex_t;
+
+#define {{ UPPER }}_PAYLOAD_BIT(field_idx)   (1U << (field_idx))
+
+/* Individual field bit defines */
+{% for pf in payload_fields %}
+#define {{ UPPER }}_PAYLOAD_BIT_{{ pf.name.upper().replace('-', '_') }}  (1U << {{ UPPER }}_PAYLOAD_IDX_{{ pf.name.upper().replace('-', '_') }})
+{% endfor %}
+
+/* Default payload mask */
+#define {{ UPPER }}_DEFAULT_PAYLOAD_MASK  ( \
+    {% for idx in default_payload_bits %} \
+        {{ UPPER }}_PAYLOAD_BIT_{{ payload_fields[idx].name.upper().replace('-', '_') }}{% if not loop.last %} | {% endif %} \
+    {% endfor %} )
+
+/* --- Function prototypes for config fields --- */
+{% for cf in config_fields if cf.name != 'all' %}
+{% set pascal = cf.name.split('_') | map('capitalize') | join('') %}
+
+/**
+ * @brief  Set the {{ cf.name }} field.
+ */
+halif_status_t {{ UPPER }}_Set{{ pascal }}(
+    halif_handle_t         h_i2c,
+    uint8_t                addr7bit,
+    {{ UPPER }}_{{ cf.name.upper() }}_t value
+);
+
+{% if cf.getter_cmd is not none and cf.reg_addr is not none %}
+/**
+ * @brief  Read back the {{ cf.name }} field.
+ */
+halif_status_t {{ UPPER }}_Read{{ pascal }}(
+    halif_handle_t              h_i2c,
+    uint8_t                     addr7bit,
+    {{ UPPER }}_{{ cf.name.upper() }}_t *out
+);
+{% endif %}
+{% endfor %}
+
+/* --- Function prototypes for payload fields --- */
+{% for pf in payload_fields %}
+{% set pascal = pf.name.split('_') | map('capitalize') | join('') %}
+
+/**
+ * @brief  Read payload field {{ pf.name }}.
+ */
+halif_status_t {{ UPPER }}_Read{{ pascal }}(
+    halif_handle_t                h_i2c,
+    uint8_t                       addr7bit,
+    {{ UPPER }}_{{ pf.name.upper() }}_t *out
+);
+{% endfor %}
+
+#ifdef __cplusplus
+}
+#endif
