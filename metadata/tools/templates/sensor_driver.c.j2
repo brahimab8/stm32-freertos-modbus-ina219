@@ -23,7 +23,7 @@ static halif_status_t ini(void *ctx) {
     if ({{ UPPER }}_Set{{ cf.name.split('_') | map('capitalize') | join('') }}(c->h_i2c, c->addr7, c->{{ cf.name }}) != HALIF_OK) return HALIF_ERROR;
 {% endif %}
 {% endfor %}
-    c->payload_mask = 0x{{ "%02X" % default_payload_mask }};  /* default mask */
+    c->payload_mask = {{ UPPER }}_DEFAULT_PAYLOAD_MASK;  /* default mask */
     return HALIF_OK;
 }
 
@@ -34,7 +34,7 @@ static halif_status_t rd(void *ctx, uint8_t out_buf[], uint8_t *out_len) {
     int total_bytes = 0;
 
 {% for pf in payload_fields %}
-    if (mask & BIT_{{ pf.name.upper() }}) {
+    if (mask & {{ UPPER }}_PAYLOAD_BIT_{{ pf.name.upper().replace('-', '_') }}) {
         if ((cursor - out_buf + {{ pf.width_bytes }}) > SENSOR_MAX_PAYLOAD) {
             *out_len = 0;
             return HALIF_ERROR;
@@ -106,7 +106,7 @@ static uint8_t get_sample_size(void *ctx) {
     {{ ctx_struct }} *c = ({{ ctx_struct }} *)ctx;
     uint8_t size = 0;
 {% for pf in payload_fields %}
-    if (c->payload_mask & (1 << {{ loop.index0 }})) {
+    if (c->payload_mask & {{ UPPER }}_PAYLOAD_BIT_{{ pf.name.upper().replace('-', '_') }}) {
         size += {{ pf.width_bytes }};
     }
 {% endfor %}
