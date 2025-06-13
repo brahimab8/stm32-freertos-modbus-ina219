@@ -1,140 +1,74 @@
 #!/usr/bin/env python3
-import os
-import re
-
-# ——————————————————————————————————————————————————————————————————————
-# Shared helpers (CTYPE, ARRAY_TYPE_RE, snake_case, CTYPEDTLS_IF_ARRAY)
-# ——————————————————————————————————————————————————————————————————————
-CTYPE = {
-    "uint8":  "uint8_t",
-    "uint16": "uint16_t",
-    "int16":  "int16_t",
-    "uint32": "uint32_t",
-    "int32":  "int32_t",
-}
-ARRAY_TYPE_RE = re.compile(r"^([a-z0-9]+)\[(\d+)\]$")
+from pathlib import Path
+from .common import render_template, write_file, snake_case
 
 
-def snake_case(name: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "_", name.lower())
-
-
-def CTYPEDTLS_IF_ARRAY(type_key: str, typedef: str) -> str:
-    """
-    If type_key is like "uint8[2]", return the typedef (e.g. "INA219_GAIN_t").
-    Otherwise return CTYPE.get(type_key, "uint16_t").
-    """
-    m = ARRAY_TYPE_RE.match(type_key)
-    if m:
-        return typedef
-    else:
-        return CTYPE.get(type_key, "uint16_t")
-
-
-# ——————————————————————————————————————————————————————————————————————
-# “Config” code-generation: header + source
-# ——————————————————————————————————————————————————————————————————————
-def build_config_header_lines(name: str, meta: dict) -> list[str]:
-    """
-    Build lines for the config header file.
-    """
-    SC = snake_case(name)
-    UPPER = name.upper()
-    struct = f"{UPPER}_config_defaults_t"
-
-    lines = [
-        f"/* Auto-generated {name} config */",
-        "#pragma once",
-        "#include <stdint.h>",
-        f"#include \"drivers/{SC}.h\"",
-        "",
-        "typedef struct {"
-    ]
-
-    # struct fields for config_defaults
-    for fld_name in meta.get("config_defaults", {}):
-        ctype = f"{UPPER}_{fld_name.upper()}_t"
-        lines.append(f"    {ctype} {fld_name};")
-    lines.append(f"}} {struct};")
-    lines.append("")
-
-    # compute default payload size
-    payload_fields = meta.get("payload_fields", [])
-    default_bits = meta.get("default_payload_bits", [])
-    if default_bits:
-        size = sum(payload_fields[i]["size"] for i in default_bits)
-    else:
-        size = sum(fld["size"] for fld in payload_fields)
-
-    lines.append(f"#define SENSOR_PAYLOAD_SIZE_{UPPER} {size}")
-    lines.append("")
-    lines.append(f"extern {struct} {SC}_defaults;")
-    lines.append("")
-
-    return lines
-
-
-def build_config_source_lines(name: str, meta: dict) -> list[str]:
-    """
-    Build lines for the config source (.c) file.
-    """
-    SC = snake_case(name)
-    UPPER = name.upper()
-    struct = f"{UPPER}_config_defaults_t"
-
-    lines = [
-        f"/* Auto-generated {name} defaults definition */",
-        f"#include \"config/{SC}_config.h\"",
-        ""
-    ]
-    lines.append(f"{struct} {SC}_defaults = {{")
-
-    for cf in meta.get("config_fields", []):
-        if cf.get("setter_cmd") is None:
-            # skip any field that has no setter (e.g. “calibration”)
-            continue
-        fld_name = cf["name"]
-        defaults = meta.get("config_defaults", {})
-        if fld_name not in defaults:
-            continue
-        val = defaults[fld_name]
-        typedef = f"{UPPER}_{fld_name.upper()}_t"
-        label_map = cf.get("enum_labels")
-        if label_map and str(val) in label_map:
-            enum_suffix = re.sub(r"[^A-Z0-9]+", "_", label_map[str(val)].upper())
-            enum_const = f"{UPPER}_{fld_name.upper()}_{enum_suffix}"
-            lines.append(f"    .{fld_name} = {enum_const},")
-        else:
-            lines.append(f"    .{fld_name} = {val},")
-    lines.append("};")
-    lines.append("")
-    return lines
-
-
-def gen_sensor_config(meta: dict, out_dir: str):
+def gen_sensor_config(meta: dict, out_dir: Path):
     """
     Emit:
-     • Core/Inc/config/<sensor>_config.h
-     • Core/Src/config/<sensor>_config.c
+      • Inc/config/<sensor>_config.h
+      • Src/config/<sensor>_config.c
+    using Jinja2 templates.
     """
-    name = meta["name"]
-    SC = snake_case(name)
+    name = meta.get("name")
+    if not name:
+        raise ValueError("Sensor metadata missing 'name' field")
+    key = snake_case(name)
+    UPPER = name.upper()
 
-    inc_cfg_dir = os.path.join(out_dir, "Inc", "config")
-    src_cfg_dir = os.path.join(out_dir, "Src", "config")
-    os.makedirs(inc_cfg_dir, exist_ok=True)
-    os.makedirs(src_cfg_dir, exist_ok=True)
+    # Prepare output directories
+    inc_cfg_dir = Path(out_dir) / "Inc" / "config"
+    src_cfg_dir = Path(out_dir) / "Src" / "config"
+    inc_cfg_dir.mkdir(parents=True, exist_ok=True)
+    src_cfg_dir.mkdir(parents=True, exist_ok=True)
 
-    # Write header
-    out_h = os.path.join(inc_cfg_dir, f"{SC}_config.h")
-    hdr_lines = build_config_header_lines(name, meta)
-    with open(out_h, "w", encoding="utf-8", newline="\n") as f:
-        f.write("\n".join(hdr_lines))
-    print(f"Wrote {out_h}")
+    config_defaults = meta.get("config_defaults", {})
+    config_fields = meta.get("config_fields", [])
+    payload_fields = meta.get("payload_fields", [])
+    default_payload_bits = meta.get("default_payload_bits", [])
 
-    # Write source
-    out_c = os.path.join(src_cfg_dir, f"{SC}_config.c")
-    src_lines = build_config_source_lines(name, meta)
-    with open(out_c, "w", encoding="utf-8", newline="\n") as f:
-        f.write("\n".join(src_lines))
-    print(f"Wrote {out_c}")
+    # JSON now includes 'count', 'width', and 'signed'
+    for pf in payload_fields:
+        pf['count'] = pf.get('count', 1)
+        pf['width'] = pf.get('width', 1)
+        pf['signed'] = pf.get('signed', False)
+        # total bytes for each payload field
+        pf['total_bytes'] = pf['count'] * pf['width']
+
+    # Compute default_payload_size
+    if default_payload_bits:
+        try:
+            default_payload_size = sum(
+                payload_fields[i]['total_bytes']
+                for i in default_payload_bits
+            )
+        except (IndexError, KeyError):
+            raise ValueError(
+                f"Invalid default_payload_bits index for sensor {name}"
+            )
+    else:
+        default_payload_size = sum(
+            pf['total_bytes'] for pf in payload_fields
+        )
+
+    # Map config_fields by name for lookup
+    config_fields_map = { cf['name']: cf for cf in config_fields }
+
+    ctx = {
+        'name': name,
+        'key': key,
+        'UPPER': UPPER,
+        'config_fields': config_fields,
+        'config_fields_map': config_fields_map,
+        'config_defaults': config_defaults,
+        'payload_fields': payload_fields,
+        'default_payload_bits': default_payload_bits,
+        'default_payload_size': default_payload_size,
+    }
+
+    # Render and write
+    hdr_out = inc_cfg_dir / f"{key}_config.h"
+    write_file(hdr_out, render_template('sensor_config.h.j2', ctx))
+
+    src_out = src_cfg_dir / f"{key}_config.c"
+    write_file(src_out, render_template('sensor_config.c.j2', ctx))
