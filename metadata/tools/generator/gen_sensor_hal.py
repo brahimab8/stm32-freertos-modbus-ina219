@@ -30,12 +30,14 @@ def gen_sensor_hal_wrapper(meta: dict, out_dir: Path):
         # Compute total byte width
         field['total_bytes'] = field['count'] * field['width']
         
+    default_payload_bits = meta.get("default_payload_bits", [])
 
     ctx = {
         "name": name,
         "key": key,
         "config_fields": config_fields,
         "payload_fields": payload_fields,
+        "default_payload_bits": default_payload_bits,
     }
 
     inc_dir = out_dir / "Inc" / "drivers"
