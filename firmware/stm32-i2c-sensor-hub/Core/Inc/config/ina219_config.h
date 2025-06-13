@@ -1,8 +1,12 @@
-/* Auto-generated ina219 config */
+/* Auto-generated ina219_config.h; do not edit! */
 #pragma once
+
 #include <stdint.h>
 #include "drivers/ina219.h"
 
+/**
+ * @brief Default configuration values for sensor ina219.
+ */
 typedef struct {
     INA219_PERIOD_t period;
     INA219_GAIN_t gain;

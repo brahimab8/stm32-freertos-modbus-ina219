@@ -1,12 +1,13 @@
-/* Auto-generated ina219_driver.h; do not edit! */
+/* Auto-generated ina219_driver.h */
 #pragma once
 
-#include "task/sensor_task.h"  /**< SensorDriver_t, SensorSample_t */
-#include "driver_registry.h"   /**< SensorRegistry_Register */
-#include "drivers/ina219.h"        /**< HAL-IF–based wrapper */
+#include "task/sensor_task.h"   /**< SensorDriver_t, SensorSample_t */
+#include "driver_registry.h"    /**< SensorRegistry_Register */
+#include "drivers/ina219.h"   /**< HAL-IF–based wrapper */
 #include <hal_if.h>
 #include <stdint.h>
 #include <stdbool.h>
+
 
 // ---------------- Public callbacks ----------------
 void ina219_init_ctx(void *vctx, halif_handle_t h_i2c, uint8_t addr7);
