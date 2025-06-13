@@ -43,9 +43,10 @@ typedef {{ pf.base_ctype }} {{ TYPEDEF }};
 /* --- Payload field indices and bitmask defines for {{ key }} --- */
 typedef enum {
     {% for pf in payload_fields %}
-    {{ UPPER }}_PAYLOAD_IDX_{{ pf.name.upper().replace('-', '_') }} = {{ loop.index0 }}{% if not loop.last %},{% endif %}
+        {{ UPPER }}_PAYLOAD_IDX_{{ pf.name.upper().replace('-', '_') }} = {{ loop.index0 }}{% if not loop.last %},
+        {% endif %}
     {% endfor %},
-    {{ UPPER }}_PAYLOAD_IDX_COUNT
+        {{ UPPER }}_PAYLOAD_IDX_COUNT
 } {{ UPPER }}_PayloadIndex_t;
 
 #define {{ UPPER }}_PAYLOAD_BIT(field_idx)   (1U << (field_idx))
@@ -56,10 +57,14 @@ typedef enum {
 {% endfor %}
 
 /* Default payload mask */
-#define {{ UPPER }}_DEFAULT_PAYLOAD_MASK  ( \
-    {% for idx in default_payload_bits %} \
-        {{ UPPER }}_PAYLOAD_BIT_{{ payload_fields[idx].name.upper().replace('-', '_') }}{% if not loop.last %} | {% endif %} \
-    {% endfor %} )
+{% if default_payload_bits and default_payload_bits | length > 0 %}
+#define {{ UPPER }}_DEFAULT_PAYLOAD_MASK  ( 
+    {%- for idx in default_payload_bits -%} 
+{{ UPPER }}_PAYLOAD_BIT_{{ payload_fields[idx].name.upper().replace('-', '_') }}{% if not loop.last %} | {% endif %} 
+    {%- endfor -%} )
+{% else %}
+#define {{ UPPER }}_DEFAULT_PAYLOAD_MASK  0
+{% endif %}
 
 /* --- Function prototypes for config fields --- */
 {% for cf in config_fields if cf.name != 'all' %}
