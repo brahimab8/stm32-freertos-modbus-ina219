@@ -6,7 +6,7 @@
     "name": {
       "type": "string",
       "description": "The unique sensor name (matches driver/module names)."
-        },
+    },
     "config_defaults": {
       "type": "object",
       "description": "Default values for each configuration field.",
@@ -29,8 +29,19 @@
           "type": {
             "type": "string"
           },
-          "size": {
-            "type": "integer"
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Number of elements (1 = scalar, >1 = array)"
+          },
+          "width": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Byte-width of each element (e.g. 2 for uint16)"
+          },
+          "signed": {
+            "type": "boolean",
+            "description": "True if the field is signed, false if unsigned"
           },
           "reg_addr": {
             "type": ["integer", "null"],
@@ -57,30 +68,38 @@
             "type": "boolean",
             "description": "If true, this field lives in the sensor’s chip or hardware; false = purely software/RTOS-side."
           },
-          "description": { 
-            "type": "string" 
+          "description": {
+            "type": "string"
           },
-          "range":       { 
-            "type": ["string", "null"] 
+          "range": {
+            "type": ["string", "null"],
+            "description": "Human-readable range description, e.g. \"1–255\"."
+          },
+          "range_min": {
+            "type": "integer",
+            "description": "Minimum allowed numeric value for setter (inclusive)."
+          },
+          "range_max": {
+            "type": "integer",
+            "description": "Maximum allowed numeric value for setter (inclusive)."
           },
           "enum_labels": {
             "type": "object",
             "additionalProperties": { "type": "string" }
           },
-          "computed":  {
-            "type": "boolean", 
-            "default": false 
+          "computed": {
+            "type": "boolean",
+            "default": false
           },
           "depends_on": {
             "type": "array",
             "items": { "type": "string" }
           },
-          "formula":   { 
-            "type": ["string","null"] 
+          "formula": {
+            "type": ["string", "null"]
           }
-      },
-
-        "required": ["name", "getter_cmd", "type", "size", "driver_side"],
+        },
+        "required": ["name", "getter_cmd", "type", "count", "width", "signed", "driver_side"],
         "if": {
           "properties": { "driver_side": { "const": true } }
         },
@@ -94,9 +113,20 @@
             "shift":    { "type": ["integer", "null"] },
             "endian":   { "type": ["string", "null"] },
             "depends_on": { "type": "array", "items": { "type": "string" } }
-
           }
         },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "setter_cmd": { "not": { "type": "null" } }
+              }
+            },
+            "then": {
+              "required": ["range_min", "range_max"]
+            }
+          }
+        ],
         "additionalProperties": false
       }
     },
@@ -114,9 +144,19 @@
             "type": "string",
             "description": "C-type string (e.g. \"uint16\", \"int32\")."
           },
-          "size": {
+          "count": {
             "type": "integer",
-            "description": "Number of bytes in that field."
+            "minimum": 1,
+            "description": "Number of elements (1 = scalar, >1 = array)"
+          },
+          "width": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Byte-width of each element"
+          },
+          "signed": {
+            "type": "boolean",
+            "description": "True if signed, false if unsigned"
           },
           "reg_addr": {
             "type": ["integer", "null"],
@@ -144,7 +184,7 @@
             "description": "Endianness for multi-byte payload fields; null if single-byte or not applicable."
           }
         },
-        "required": ["name", "type", "size", "scale_factor"],
+        "required": ["name", "type", "count", "width", "signed", "scale_factor"],
         "if": {
           "properties": { "reg_addr": { "type": "integer" } }
         },
