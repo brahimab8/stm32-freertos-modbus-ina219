@@ -25,12 +25,21 @@ def test_payload_size_and_type_code(sensor_file):
     # type code matches protocol.sensors
     assert registry.type_code(name) == protocol.sensors[name]
 
-    # payload size is computed exactly as in SensorRegistry._load():
+    # payload width is computed exactly as in SensorRegistry._load():
     default_bits = meta.get('default_payload_bits', [])
     if default_bits:
-        expected_size = sum(meta['payload_fields'][i]['size'] for i in default_bits)
+        expected_size = 0
+        for i in default_bits:
+            fld = meta['payload_fields'][i]
+            width = fld.get('width', 1)
+            count = fld.get('count', 1)
+            expected_size += count * width
     else:
-        expected_size = sum(field['size'] for field in meta['payload_fields'])
+        expected_size = 0
+        for f in meta['payload_fields']:
+            width = f.get('width', 1)
+            count = f.get('count', 1)
+            expected_size += count * width
     assert registry.payload_size(name) == expected_size
 
     # metadata returns full JSON
