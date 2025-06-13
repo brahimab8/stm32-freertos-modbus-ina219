@@ -135,10 +135,12 @@ class SensorMaster:
 
         # Use provided mask if given, otherwise fall back to default mask
         if mask_val is None:
-            mask_bits = registry.metadata(sensor_name).get('default_payload_bits', [])
-            mask_val = sum(1 << b for b in mask_bits)
+            mask_val = self.get_payload_mask(board_id, addr)
 
-        records, offset = [], 0
+        records = []
+        offset = 0
+        meta = registry.metadata(sensor_name)
+        payload_fields = meta.get('payload_fields', [])
         while offset < len(payload):
             chunk = payload[offset:]
             entry = registry.parse_payload(sensor_name, chunk, mask_val)
@@ -148,9 +150,14 @@ class SensorMaster:
 
             # 4 bytes for timestamp + sum of enabled field sizes
             consumed = 4
-            for idx, fld in enumerate(registry.metadata(sensor_name)['payload_fields']):
+            for idx, fld in enumerate(payload_fields):
                 if mask_val & (1 << idx):
-                    consumed += fld['size']
+                    if 'width' in fld:
+                        width = fld['width']
+                    else:
+                        raise RuntimeError(f"Missing 'width' in metadata for {sensor_name} payload_fields[{idx}]")
+                    count = fld.get('count', 1)
+                    consumed += count * width
             offset += consumed
 
         return records
