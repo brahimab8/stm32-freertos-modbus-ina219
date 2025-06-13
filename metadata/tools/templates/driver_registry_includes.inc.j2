@@ -1,0 +1,4 @@
+{%- for sc, orig in sensors %}
+#include "drivers/{{ sc }}_driver.h"    // for {{ orig }}_RegisterDriver
+{%- endfor %}
+

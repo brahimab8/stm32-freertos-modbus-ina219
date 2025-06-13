@@ -1,0 +1,37 @@
+/* Auto-generated {{ name }}_driver.h */
+#pragma once
+
+#include "task/sensor_task.h"   /**< SensorDriver_t, SensorSample_t */
+#include "driver_registry.h"    /**< SensorRegistry_Register */
+#include "drivers/{{ key }}.h"   /**< HAL-IF–based wrapper */
+#include <hal_if.h>
+#include <stdint.h>
+#include <stdbool.h>
+
+{% set UPPER = name.upper() %}
+{% set ctx_struct = UPPER + "_Ctx_t" %}
+
+// ---------------- Public callbacks ----------------
+void {{ key }}_init_ctx(void *vctx, halif_handle_t h_i2c, uint8_t addr7);
+bool {{ key }}_configure(void *vctx, uint8_t field_id, uint8_t value);
+
+// Reader that returns N bytes for each GET_… command:
+bool {{ key }}_read_config_bytes(void *vctx, uint8_t field_id, uint8_t *out_buf, size_t *out_len);
+
+// vtable getter:
+const SensorDriver_t *{{ UPPER }}_GetDriver(void);
+
+// Register this driver into the global registry:
+void {{ key }}_RegisterDriver(void);
+
+/**
+ * @brief   Context for a sensor instance.
+ */
+typedef struct {
+    halif_handle_t   h_i2c;      /**< HAL-IF handle */
+    uint8_t          addr7;     /**< 7-bit I²C address */
+{% for cf in config_fields if cf.name != "all" %}
+    {{ cf.ctype }} {{ cf.name }};
+{% endfor %}
+    uint8_t payload_mask;   /**< which payload bits are enabled */
+} {{ ctx_struct }};

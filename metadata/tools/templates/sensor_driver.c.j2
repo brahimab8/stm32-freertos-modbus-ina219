@@ -1,0 +1,180 @@
+/* Auto-generated {{ name }}_driver.c */
+#include "drivers/{{ key }}_driver.h"
+#include "config/{{ key }}_config.h"
+#include "config/protocol.h"
+#include <string.h>
+#include <stdbool.h>
+
+{% set UPPER = name.upper() %}
+{% set ctx_struct = UPPER + "_Ctx_t" %}
+
+static halif_status_t ini(void *ctx) {
+    {{ ctx_struct }} *c = ({{ ctx_struct }} *)ctx;
+{% for cf in config_fields if cf.name != "all" and not cf.computed %}
+    if ({{ UPPER }}_Set{{ cf.name.split('_') | map('capitalize') | join('') }}(c->h_i2c, c->addr7, {{ key }}_defaults.{{ cf.name }}) != HALIF_OK) return HALIF_ERROR;
+{% endfor %}
+{% for cf in config_fields if cf.name != "all" and not cf.computed %}
+    c->{{ cf.name }} = {{ key }}_defaults.{{ cf.name }};
+{% endfor %}
+{% for cf in config_fields if cf.computed %}
+    /* compute {{ cf.name }} from dependencies */
+    c->{{ cf.name }} = {{ cf.formula }};
+{% if cf.reg_addr is not none %}
+    if ({{ UPPER }}_Set{{ cf.name.split('_') | map('capitalize') | join('') }}(c->h_i2c, c->addr7, c->{{ cf.name }}) != HALIF_OK) return HALIF_ERROR;
+{% endif %}
+{% endfor %}
+    c->payload_mask = 0x{{ "%02X" % default_payload_mask }};  /* default mask */
+    return HALIF_OK;
+}
+
+static halif_status_t rd(void *ctx, uint8_t out_buf[], uint8_t *out_len) {
+    {{ ctx_struct }} *c = ({{ ctx_struct }} *)ctx;
+    uint8_t *cursor = out_buf;
+    uint8_t mask = c->payload_mask;
+    int total_bytes = 0;
+
+{% for pf in payload_fields %}
+    if (mask & BIT_{{ pf.name.upper() }}) {
+        if ((cursor - out_buf + {{ pf.width_bytes }}) > SENSOR_MAX_PAYLOAD) {
+            *out_len = 0;
+            return HALIF_ERROR;
+        }
+        {{ pf.base_ctype }} var_{{ pf.name }};
+        if ({{ UPPER }}_Read{{ pf.name.split('_') | map('capitalize') | join('') }}(c->h_i2c, c->addr7, &var_{{ pf.name }}) != HALIF_OK) {
+            *out_len = 0;
+            return HALIF_ERROR;
+        }
+        /* pack big-endian */
+        for (int b = {{ pf.width_bytes }} - 1; b >= 0; --b) {
+            *cursor++ = (uint8_t)((var_{{ pf.name }} >> (8 * b)) & 0xFF);
+        }
+        total_bytes += {{ pf.width_bytes }};
+    }
+{% endfor %}
+    *out_len = total_bytes;
+    return HALIF_OK;
+}
+
+bool {{ key }}_read_config_bytes(void *vctx, uint8_t field, uint8_t *out_buf, size_t *out_len) {
+    {{ ctx_struct }} *c = ({{ ctx_struct }} *)vctx;
+    switch (field) {
+{% for cf in config_fields if cf.getter_cmd is not none and cf.name != "all" and not cf.computed %}
+      case {{ cf.getter_cmd }}:
+        out_buf[0] = (uint8_t)c->{{ cf.name }};
+        *out_len = 1;
+        return true;
+
+{% endfor %}
+{% for cf in config_fields if cf.getter_cmd is not none and cf.computed %}
+      case {{ cf.getter_cmd }}:
+      {
+          /* read computed field {{ cf.name }} from the device */
+          {{ UPPER }}_{{ cf.name.upper() }}_t val;
+          if ({{ UPPER }}_Read{{ cf.name.split('_') | map('capitalize') | join('') }}(c->h_i2c, c->addr7, &val) != HALIF_OK) {
+              return false;
+          }
+          /* pack into big-endian bytes */
+          for (int i = 0; i < {{ cf.width_bytes }}; ++i) {
+              out_buf[i] = (uint8_t)( val >> (8 * ({{ cf.width_bytes }} - 1 - i)) );
+          }
+          *out_len = {{ cf.width_bytes }};
+          return true;
+      }
+
+{% endfor %}
+      case CMD_GET_PAYLOAD_MASK:
+        out_buf[0] = c->payload_mask;
+        *out_len = 1;
+        return true;
+      default:
+        return false;
+    }
+}
+
+static const uint8_t {{ key }}_config_fields[] = {
+{% for cf in config_fields if cf.getter_cmd is not none and cf.setter_cmd is not none and cf.name != "all" %}
+    {{ cf.getter_cmd }},
+{% endfor %}
+};
+
+const uint8_t *{{ key }}_get_config_fields(size_t *count) {
+    if (count) *count = sizeof({{ key }}_config_fields) / sizeof({{ key }}_config_fields[0]);
+    return {{ key }}_config_fields;
+}
+
+static uint8_t get_sample_size(void *ctx) {
+    {{ ctx_struct }} *c = ({{ ctx_struct }} *)ctx;
+    uint8_t size = 0;
+{% for pf in payload_fields %}
+    if (c->payload_mask & (1 << {{ loop.index0 }})) {
+        size += {{ pf.width_bytes }};
+    }
+{% endfor %}
+    return size;
+}
+
+static const SensorDriver_t {{ key }}_driver = {
+    .init = (HAL_StatusTypeDef (*)(void *)) ini,
+    .read = (HAL_StatusTypeDef (*)(void *, uint8_t *, uint8_t *)) rd,
+    .sample_size = get_sample_size,
+    .read_config_bytes = {{ key }}_read_config_bytes,
+};
+
+const SensorDriver_t *{{ UPPER }}_GetDriver(void) {
+    return &{{ key }}_driver;
+}
+
+static uint32_t {{ key }}_default_period_ms(void) {
+    return {{ config_defaults.get("period", 5) }} * 100;
+}
+
+static const SensorDriverInfo_t {{ key }}_info = {
+    .type_code = SENSOR_TYPE_{{ UPPER }},
+    .ctx_size = sizeof({{ ctx_struct }}),
+    .init_ctx = {{ key }}_init_ctx,
+    .get_driver = {{ UPPER }}_GetDriver,
+    .configure = {{ key }}_configure,
+    .read_config_bytes = {{ key }}_read_config_bytes,
+    .get_config_fields = {{ key }}_get_config_fields,
+    .get_default_period_ms = {{ key }}_default_period_ms,
+};
+
+void {{ key }}_RegisterDriver(void) {
+    SensorRegistry_Register(&{{ key }}_info);
+}
+
+void {{ key }}_init_ctx(void *vctx, halif_handle_t h_i2c, uint8_t addr7) {
+    {{ ctx_struct }} *c = ({{ ctx_struct }} *)vctx;
+    c->h_i2c = h_i2c;
+    c->addr7 = addr7;
+}
+
+bool {{ key }}_configure(void *vctx, uint8_t field_id, uint8_t param) {
+    {{ ctx_struct }} *c = ({{ ctx_struct }} *)vctx;
+    halif_status_t rc;
+
+    switch (field_id) {
+{% for cf in config_fields if cf.setter_cmd is not none and not cf.computed %}
+      case {{ cf.setter_cmd }}:
+        rc = {{ UPPER }}_Set{{ cf.name.split('_') | map('capitalize') | join('') }}(c->h_i2c, c->addr7, ({{ cf.ctype }})param);
+        if (rc == HALIF_OK) {
+            c->{{ cf.name }} = ({{ cf.ctype }})param;
+{% for comp in config_fields if comp.computed and cf.name in (comp.depends_on or []) %}
+            // Recompute {{ comp.name }} because {{ cf.name }} changed
+            c->{{ comp.name }} = {{ comp.formula }};
+{% if comp.reg_addr is not none %}
+            {{ UPPER }}_Set{{ comp.name.split('_') | map('capitalize') | join('') }}(c->h_i2c, c->addr7, c->{{ comp.name }});
+{% endif %}
+{% endfor %}
+            return true;
+        }
+        return false;
+
+{% endfor %}
+      case CMD_SET_PAYLOAD_MASK:
+        c->payload_mask = param;
+        return true;
+      default:
+        return false;
+    }
+}
