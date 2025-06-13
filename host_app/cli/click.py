@@ -27,7 +27,7 @@ def handle_result(label, status):
 @click.pass_context
 def session(ctx):
     """Enter an interactive sensor-cli session."""
-    from core.cli.shell import SensorShell
+    from cli.shell import SensorShell
     SensorShell(ctx.obj).cmdloop()
 
 
